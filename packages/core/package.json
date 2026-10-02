@@ -10,5 +10,5 @@
     "fast-glob": "^3.3.3",
     "react-docgen-typescript": "^2.4.0"
   },
-  "peerDependencies": { "react": ">=18" }
+  "peerDependencies": { "react": ">=18", "typescript": "6.0.3" }
 }
