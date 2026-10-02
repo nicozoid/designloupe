@@ -23,21 +23,59 @@ const PREFIX = "virtual:loupe/";
 const posix = (p: string) => p.split(path.sep).join("/");
 const fsUrl = (abs: string) => `/@fs${posix(abs).startsWith("/") ? "" : "/"}${posix(abs)}`;
 const imp = (abs: string) => `() => import(${JSON.stringify(fsUrl(abs))})`;
+const real = (p: string) => {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+};
+/** `file` is `dir` or inside it (a bare prefix check would count `/a/repo-config` as inside `/a/repo`). */
+export const within = (file: string, dir: string) => file === dir || file.startsWith(dir + path.sep);
+/** A package specifier, not a relative/absolute path or a scheme (`virtual:`, `node:`, `\0...`). */
+const isBare = (s: string) => !s.startsWith(".") && !s.startsWith("\0") && !path.isAbsolute(s) && !s.includes(":");
+
+/** Build output, caches and dot-dirs: changes there never affect discovery. */
+const IGNORED_DIRS = new Set(["node_modules", "dist", "build", "out", "coverage"]);
+
+/** Whether a watcher event for `file` should trigger rediscovery. */
+export function shouldRediscover(file: string, dirs: { root: string; loupeDir?: string }): boolean {
+  if (!/\.(tsx?|jsx?)$/.test(file)) return false;
+  const base = [dirs.root, dirs.loupeDir].find((d): d is string => !!d && within(file, d));
+  if (!base) return false;
+  const segments = path.relative(base, file).split(path.sep).slice(0, -1);
+  return !segments.some((d) => d.startsWith(".") || IGNORED_DIRS.has(d));
+}
+
+/** Two models describe the same thing (ignoring when they were generated). */
+export function sameModel(a: DiscoveryModel, b: DiscoveryModel): boolean {
+  return JSON.stringify({ ...a, generatedAt: "" }) === JSON.stringify({ ...b, generatedAt: "" });
+}
 
 export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryModel; rediscover: () => Promise<DiscoveryModel> }): Plugin {
   const { config } = opts;
   let model = opts.model;
-  const anchor = path.join(config.root, "__loupe_anchor__.js");
+  // Real paths: Vite hands us symlink-resolved importers (e.g. macOS /tmp is /private/tmp).
+  const root = real(config.root);
+  const configDir = real(config.configDir);
+  const loupeDir = config.loupeDir ? real(config.loupeDir) : undefined;
+  // Importer for "resolve as if from the target". Vite only bases resolution on an importer's folder when the
+  // importer exists or ends in "*" (otherwise it silently falls back to the Vite root, i.e. the viewer).
+  const anchor = path.join(root, "*");
   const nm = `${path.sep}node_modules${path.sep}`;
-  const inTarget = (f: string) => f.startsWith(config.root + path.sep) && !f.includes(nm);
+  const inTarget = (f: string) => within(f, root) && !f.includes(nm);
+  const inRepo = (f: string) => within(f, REPO_ROOT);
+  /** Config folder / loupe files living outside both this repo and the target: they have no node_modules of their own. */
+  const inOutsideConfig = (f: string) =>
+    (within(f, configDir) || (!!loupeDir && within(f, loupeDir))) && !inRepo(f) && !within(f, root);
   const shims: Record<string, string> = {
     ...(config.presets.includes("next") ? Object.fromEntries(Object.entries(NEXT_PRESET).map(([k, f]) => [k, path.join(NEXT_SHIMS_DIR, f)])) : {}),
     ...config.shims,
   };
 
   const loupeFiles = () => {
-    if (!config.loupeDir) return { docs: [] as string[], anomalies: undefined, tokens: undefined };
-    const opt = { cwd: config.loupeDir, absolute: true, ignore: ["**/node_modules/**"] };
+    if (!loupeDir) return { docs: [] as string[], anomalies: undefined, tokens: undefined };
+    const opt = { cwd: loupeDir, absolute: true, ignore: ["**/node_modules/**"] };
     return {
       docs: fg.sync("**/*.loupe.{ts,tsx}", opt).sort(),
       anomalies: fg.sync("anomalies.{ts,tsx}", opt)[0],
@@ -48,7 +86,7 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
   const modules: Record<string, () => string> = {
     model: () => `export default ${JSON.stringify(model)};`,
     components: () => {
-      const entries = model.components.map((c) => `  ${JSON.stringify(c.id)}: ${imp(path.join(config.root, c.file))},`);
+      const entries = model.components.map((c) => `  ${JSON.stringify(c.id)}: ${imp(path.join(root, c.file))},`);
       return `export default {\n${entries.join("\n")}\n};`;
     },
     theme: () => {
@@ -84,19 +122,25 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
   };
 
   let timer: NodeJS.Timeout | undefined;
+  let generation = 0;
   const watch = (server: ViteDevServer) => {
     const onChange = (file: string) => {
-      if (!/\.(tsx?|jsx?)$/.test(file)) return;
-      const inLoupe = config.loupeDir && file.startsWith(config.loupeDir + path.sep);
-      if (!inTarget(file) && !inLoupe) return;
+      if (!shouldRediscover(real(file), { root, loupeDir })) return;
       clearTimeout(timer);
       timer = setTimeout(async () => {
+        const gen = ++generation;
+        let next: DiscoveryModel;
         try {
-          model = await opts.rediscover();
+          next = await opts.rediscover();
         } catch (e) {
           server.config.logger.error(`[designloupe] rediscovery failed: ${(e as Error).message}`);
           return;
         }
+        // A newer run started meanwhile: its result wins, never this older one.
+        if (gen !== generation) return;
+        // Ordinary edits leave the model unchanged; Vite's own HMR covers them.
+        if (sameModel(next, model)) return;
+        model = next;
         for (const name of Object.keys(modules)) {
           const mod = server.moduleGraph.getModuleById(`\0${PREFIX}${name}`);
           if (mod) server.moduleGraph.invalidateModule(mod);
@@ -104,7 +148,7 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
         server.ws.send({ type: "full-reload" });
       }, 300);
     };
-    server.watcher.add([config.root, ...(config.loupeDir ? [config.loupeDir] : [])]);
+    server.watcher.add([root, ...(loupeDir ? [loupeDir] : [])]);
     server.watcher.on("add", onChange).on("unlink", onChange).on("change", onChange);
   };
 
@@ -112,6 +156,16 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
     name: "designloupe",
     enforce: "pre",
     configureServer: watch,
+    configResolved(resolved) {
+      // Vite resolves optimizeDeps.include ids (plugin-react adds react, react-dom, react/jsx-dev-runtime) from the
+      // Vite root without running plugins, so they would be prebundled from this repo's copy, not the target's.
+      // Drop them: the scanner and runtime discovery go through resolveId below and so prebundle the target's copy.
+      const strip = (o?: { include?: string[] }) => {
+        if (o?.include) o.include.splice(0, o.include.length, ...o.include.filter((id) => !isShared(id)));
+      };
+      strip(resolved.optimizeDeps);
+      for (const env of Object.values(resolved.environments)) strip(env.optimizeDeps);
+    },
     async resolveId(source, importer, options) {
       if (source.startsWith(PREFIX)) return `\0${source}`;
       if (source in shims) {
@@ -119,10 +173,14 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
         return path.isAbsolute(t) ? t : this.resolve(t, anchor, { ...options, skipSelf: true });
       }
       if (source === "@target" || source.startsWith("@target/")) {
-        return this.resolve(path.join(config.root, source.slice("@target".length)), importer, { ...options, skipSelf: true });
+        return this.resolve(path.join(root, source.slice("@target".length)), importer, { ...options, skipSelf: true });
       }
-      if (source.startsWith("@designloupe/") && importer && !importer.startsWith(REPO_ROOT)) {
+      if (source.startsWith("@designloupe/") && importer && !inRepo(importer)) {
         return this.resolve(source, path.join(REPO_ROOT, "package.json"), { ...options, skipSelf: true });
+      }
+      // Out-of-repo config/loupe files import as if they lived in the target (react-i18next, @tanstack/react-query, ...).
+      if (isBare(source) && importer && inOutsideConfig(importer)) {
+        return this.resolve(source, anchor, { ...options, skipSelf: true });
       }
       // Virtual modules count as "not target" too, so e.g. virtual:loupe/icons gets the target's @mui/icons-material.
       if (isShared(source) && importer && !inTarget(importer)) {

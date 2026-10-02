@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
+import type { ResolvedConfig } from "@designloupe/core";
 import { loadConfig } from "@designloupe/core/node";
 import { createLoupeServer } from "./server";
 import { REPO_ROOT } from "./paths";
@@ -40,15 +43,90 @@ describe("loupe server", () => {
     expect(adapter.id).toBe("mui");
   });
 
-  it("applies next preset shims, @target, and shared-package resolution", async () => {
+  it("applies next preset shims, @target and @designloupe resolution", async () => {
     const link = await resolve("next/link", path.join(fixture, "src/components/DocsLink.tsx"));
     expect(link?.id).toBe(path.join(REPO_ROOT, "packages/viewer/src/shims/next/link.tsx"));
     const tgt = await resolve("@target/src/i18n", path.join(REPO_ROOT, "examples/fixture-loupe/Wrapper.tsx"));
     expect(tgt?.id).toBe(path.join(fixture, "src/i18n.ts"));
     const core = await resolve("@designloupe/core", "/tmp/elsewhere/x.loupe.tsx");
     expect(core?.id).toBe(path.join(REPO_ROOT, "packages/core/src/index.ts"));
-    const react = await resolve("react", path.join(REPO_ROOT, "packages/viewer/src/main.tsx"));
-    // The client environment hands back Vite's pre-bundled copy once the dep optimiser has run.
-    expect(react?.id).toMatch(/node_modules[\\/](react[\\/]|\.vite[\\/]deps[\\/]react\.js)/);
+  });
+});
+
+/**
+ * A target and a config folder outside this repo. The target has its own (stub) packages, so a
+ * resolution that wrongly falls back to this repo's node_modules is visible.
+ */
+describe("loupe server with an out-of-repo target", () => {
+  let tmp: string;
+  let target: string;
+  let cfgDir: string;
+  let srv: ViteDevServer;
+  const write = (file: string, text: string) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+  };
+  const stubPkg = (name: string) => {
+    write(path.join(target, "node_modules", name, "package.json"), JSON.stringify({ name, version: "0.0.0-stub", main: "index.js" }));
+    write(path.join(target, "node_modules", name, "index.js"), "module.exports = {};\n");
+  };
+  /** Resolve on the client; for a prebundled dep, report the source file the optimiser bundled it from. */
+  const res = async (id: string, importer: string) => {
+    const r = await srv.environments.client.pluginContainer.resolveId(id, importer);
+    const meta = srv.environments.client.depsOptimizer?.metadata;
+    if (!r || !meta) return r;
+    const file = r.id.split("?")[0];
+    const dep = [...Object.values(meta.optimized), ...Object.values(meta.discovered)].find((d) => d.file === file);
+    return dep ? { ...r, id: dep.src! } : r;
+  };
+
+  beforeAll(async () => {
+    // Deliberately not realpath'd: on macOS os.tmpdir() is behind a symlink, which the plugin must see through.
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "loupe-target-"));
+    target = path.join(tmp, "app");
+    cfgDir = path.join(tmp, "app-loupe");
+    write(path.join(target, "package.json"), JSON.stringify({ name: "stub-app", private: true }));
+    write(path.join(target, "src/components/Hello.tsx"), "export function Hello() { return null; }\n");
+    stubPkg("react");
+    stubPkg("react-i18next");
+    write(path.join(cfgDir, "Wrapper.tsx"), "export default function W({ children }: { children: unknown }) { return children; }\n");
+    const config: ResolvedConfig = {
+      name: "Stub", root: target, adapter: "mui", themeExport: "theme",
+      componentGlobs: ["src/components/**/*.tsx"], ignoreGlobs: [], usageGlobs: ["src/**/*.tsx"],
+      tsconfig: path.join(target, "tsconfig.json"), wrapper: path.join(cfgDir, "Wrapper.tsx"),
+      shims: {}, presets: [], define: {},
+      configPath: path.join(cfgDir, "loupe.config.ts"), configDir: cfgDir, loupeDir: cfgDir,
+      // No prebundling (stubs aren't real packages) and no HMR socket (the fixture server above holds the port).
+      vite: { optimizeDeps: { noDiscovery: true }, server: { ws: false } },
+    };
+    srv = await createLoupeServer(config, { middlewareMode: true });
+  }, 120_000);
+  afterAll(async () => {
+    const cacheDir = srv?.config.cacheDir;
+    await srv?.close();
+    if (cacheDir) fs.rmSync(cacheDir, { recursive: true, force: true });
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  const stub = (name: string) => path.join(fs.realpathSync(target), "node_modules", name, "index.js");
+
+  it("gives the viewer the target's copy of shared packages", async () => {
+    expect((await res("react", path.join(REPO_ROOT, "packages/viewer/src/main.tsx")))?.id).toBe(stub("react"));
+  });
+
+  it("resolves every bare import in an out-of-repo config folder from the target", async () => {
+    const wrapper = path.join(fs.realpathSync(cfgDir), "Wrapper.tsx");
+    expect((await res("react", wrapper))?.id).toBe(stub("react"));
+    expect((await res("react-i18next", wrapper))?.id).toBe(stub("react-i18next"));
+    expect((await res("@designloupe/core", wrapper))?.id).toBe(path.join(REPO_ROOT, "packages/core/src/index.ts"));
+  });
+
+  it("never prebundles shared packages via optimizeDeps.include (that path resolves from the viewer, bypassing plugins)", () => {
+    const include = srv.environments.client.config.optimizeDeps.include ?? [];
+    expect(include.filter((id) => /^(react|react-dom|@mui\/|@emotion\/)/.test(id))).toEqual([]);
+  });
+
+  it("keeps its dep cache per target, inside this repo", () => {
+    expect(srv.config.cacheDir.startsWith(path.join(REPO_ROOT, "node_modules/.vite/loupe-"))).toBe(true);
   });
 });
