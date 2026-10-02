@@ -1,0 +1,14 @@
+{
+  "name": "@designloupe/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./node": "./src/node.ts" },
+  "dependencies": {
+    "zod": "^4.6.5",
+    "jiti": "^2.7.0",
+    "fast-glob": "^3.3.3",
+    "react-docgen-typescript": "^2.4.0"
+  },
+  "peerDependencies": { "react": ">=18" }
+}

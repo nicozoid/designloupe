@@ -1,0 +1,24 @@
+{
+  "name": "designloupe",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "examples/*"],
+  "scripts": {
+    "loupe": "tsx packages/cli/src/bin.ts",
+    "loupe:fixture": "tsx packages/cli/src/bin.ts dev --config examples/fixture-loupe/loupe.config.ts",
+    "doctor:fixture": "tsx packages/cli/src/bin.ts doctor --config examples/fixture-loupe/loupe.config.ts",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "^5.0.3",
+    "tsx": "^4.23.15",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0"
+  },
+  "engines": { "node": ">=22" }
+}

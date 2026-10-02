@@ -1,0 +1,17 @@
+{
+  "name": "@designloupe/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "designloupe": "./src/bin.ts" },
+  "dependencies": {
+    "@designloupe/core": "0.1.0",
+    "@designloupe/adapter-mui": "0.1.0",
+    "@designloupe/viewer": "0.1.0",
+    "vite": "^8.3.2",
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite-tsconfig-paths": "^6.1.1",
+    "cac": "^7.0.0",
+    "fast-glob": "^3.3.3"
+  }
+}
