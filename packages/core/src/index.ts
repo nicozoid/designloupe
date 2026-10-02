@@ -13,3 +13,4 @@ export { contrastRatio, compositeHex, flattenOver, thresholdFor, resolveWcag, ro
 export type { WcagRow, WcagRollup, WcagVerdict } from "./a11y/a11y";
 export { planAutoDemo } from "./demo/plan";
 export type { DemoPlan } from "./demo/plan";
+export { hintFor } from "./hints";

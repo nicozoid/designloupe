@@ -1,6 +1,13 @@
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import model from "virtual:loupe/model";
+import { LoupeProvider } from "./state";
+import { App } from "./App";
+import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(
-  <p>Design Loupe: {model.name}, {model.components.length} components</p>,
+  <StrictMode>
+    <LoupeProvider>
+      <App />
+    </LoupeProvider>
+  </StrictMode>,
 );
