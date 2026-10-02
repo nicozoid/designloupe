@@ -9,3 +9,7 @@ export type { ApgPattern, WcagLevel } from "./a11y/wcag-meta";
 export { anomalyCode, fnv1a } from "./anomalies/codes";
 export { mergeAnomalies } from "./anomalies/merge";
 export { categoryInfo, statusInfo } from "./anomalies/meta";
+export { contrastRatio, compositeHex, flattenOver, thresholdFor, resolveWcag, rollupWcag } from "./a11y/a11y";
+export type { WcagRow, WcagRollup, WcagVerdict } from "./a11y/a11y";
+export { planAutoDemo } from "./demo/plan";
+export type { DemoPlan } from "./demo/plan";
