@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "ignoreDeprecations": "6.0", "baseUrl": ".", "paths": { "@/*": ["src/*"] }, "types": ["vite/client"] },
+  "include": ["src"]
+}

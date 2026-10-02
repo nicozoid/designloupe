@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": { "@target/*": ["../mui-fixture/*"], "@/*": ["../mui-fixture/src/*"] },
+    "types": ["vite/client"]
+  },
+  "include": [".", "../mui-fixture/src/theme/augment.d.ts", "../mui-fixture/src/next-env.d.ts"]
+}
