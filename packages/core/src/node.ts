@@ -4,3 +4,6 @@ export type { Analysis } from "./analysis/program";
 export { scanSource, parse } from "./analysis/scan-file";
 export type { FileScan, ImportBinding, JsxUse, ReExport } from "./analysis/scan-file";
 export { findStaticIssues } from "./anomalies/static-rules";
+export { discover } from "./discovery/discover";
+export { toPropInfo } from "./discovery/props";
+export { readPackageVersion } from "./discovery/package-version";
