@@ -202,6 +202,31 @@ Dropped: Tailwind/`cn`, cva variant metadata, Radix "built from" links, the `nex
   7. what not to do (never edit the target repo without asking).
 - `docs/config.md`, `docs/loupe-files.md` and `docs/adapters.md` (how to write a new adapter).
 
+## Plan-time amendments (2026-10-02)
+
+These came out of writing the implementation plan. They override the sections above where they differ.
+
+1. **The viewer chrome uses plain CSS (`dl-` classes, `--dl-*` variables), not MUI.**
+   - MUI `sx`/`styled` resolve against the *nearest* ThemeProvider. Chrome rendered inside the target's theme would pick up the target's styles.
+   - Nesting ThemeProviders with CSS-variable themes and colour-scheme managers is fragile.
+   - With plain-CSS chrome, one target `PreviewRoot` (target ThemeProvider + colour-scheme sync + user wrapper) wraps the whole viewer. Each preview gets `ScopedCssBaseline` and an error boundary. Chrome and target never share styling.
+2. **TypeScript is pinned to 6.0.3 repo-wide.** TS 7 (the native port) has no classic JS compiler API, which `react-docgen-typescript` and the import/JSX scanner need. This is independent of the target's TypeScript version.
+3. **`@designloupe/core` is split:**
+   - `@designloupe/core`: browser-safe types, `define*` helpers, a11y maths, demo planning, anomaly merge.
+   - `@designloupe/core/node`: config loading, discovery, static rules.
+
+   The adapter is split the same way: `@designloupe/adapter-mui/node` and `@designloupe/adapter-mui/browser`.
+4. **Two config additions for unknown builds:**
+   - `presets: ["next"]` turns on built-in shims for `next/link`, `next/image`, `next/navigation`, `next/router`, `next/dynamic`, `next/head` and `next/font/*`.
+   - `vite: {...}` is an escape hatch merged into the Vite config, for plugins such as SVGR or sass.
+   - Defaults define `process.env.NODE_ENV` and `process.env` so CRA/Next-style env reads don't crash.
+5. **Shared packages resolve from the target.**
+   - `react`, `react-dom`, `@mui/*` and `@emotion/*` imported by the viewer, adapter or loupe files resolve from the target root. A Vite `resolveId` plugin re-resolves them with the target as importer, so one copy is shared and package `exports` maps are respected.
+   - `@designloupe/*` imported from loupe files outside this repo resolve to this repo.
+   - `@target/*` is an alias for the target root.
+6. **Anomaly category `build`** is added for automatic import/render failures. Automatic codes are 4-character base36 values from an FNV-1a hash of `rule|file|snippet`.
+7. **Routing is hash-based** (`#/tokens/colour`, `#/components/<group>/<Name>`), with no router dependency in the viewer.
+
 ## Out of scope (for now)
 
 - Publishing to npm.
