@@ -5,6 +5,7 @@ import { loadTheme } from "virtual:loupe/theme";
 import { loadWrapper } from "virtual:loupe/wrapper";
 import { componentDocs, loadAnomalies, loadTokenNotes } from "virtual:loupe/loupe-files";
 import type { AdapterBrowser, Anomaly, ComponentDocInput, DiscoveryModel, Mode, OverrideEntry, TokenModel, TokenNotes } from "@designloupe/core";
+import { collectDocs } from "./docs";
 
 export interface LoupeState {
   model: DiscoveryModel;
@@ -74,14 +75,10 @@ async function loadAll(): Promise<Loaded> {
       out.wrapperError = msg(e);
     }
   }
-  const docs = await Promise.allSettled(componentDocs.map((f) => f()));
-  docs.forEach((r, i) => {
-    if (r.status === "rejected") return out.docErrors.push(`Loupe file #${i + 1}: ${msg(r.reason)}`);
-    const d = r.value.default;
-    const ids = idsFor(d.component);
-    if (!ids.length) out.docErrors.push(`Loupe file for "${d.component}" matches no discovered component.`);
-    for (const id of ids) out.docs.set(id, d);
-  });
+  const settled = await Promise.allSettled(componentDocs.map((f) => f()));
+  const { docs, docErrors } = collectDocs(settled, idsFor);
+  out.docs = docs;
+  out.docErrors.push(...docErrors);
   try {
     out.authoredAnomalies = (await loadAnomalies?.()) ?? [];
   } catch (e) {
@@ -101,7 +98,12 @@ export function LoupeProvider({ children }: { children: ReactNode }) {
   const [failures, setFailures] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    loadAll().then(setLoaded);
+    loadAll().then(setLoaded).catch((e) =>
+      setLoaded({
+        model, adapter, theme: null, tokens: null, overrides: [], docs: new Map(), docErrors: [`Loading failed: ${msg(e)}`],
+        authoredAnomalies: [], tokenNotes: {}, Wrapper: null,
+      }),
+    );
   }, []);
 
   const canDark = !!loaded?.theme && adapter.hasDarkScheme(loaded.theme);
