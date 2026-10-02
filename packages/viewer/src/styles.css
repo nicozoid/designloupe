@@ -70,3 +70,23 @@ a.dl-tile:hover { border-color: var(--dl-accent); }
 .dl-code { font: 12px/1.5 var(--dl-mono); background: var(--dl-sunken); border-radius: 6px; padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; white-space: pre; }
 .dl-muted { color: var(--dl-muted); }
 .dl-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.dl-card-title { margin: 0 0 0.5rem; font-size: 0.95rem; text-transform: capitalize; }
+.dl-swatches { display: grid; gap: 0.5rem; }
+.dl-swatch { display: grid; grid-template-columns: 3rem 1fr; gap: 0.6rem; align-items: center; }
+.dl-swatch-colour { width: 3rem; height: 3rem; border-radius: 6px; border: 1px solid var(--dl-border); }
+.dl-swatch-meta { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; font-size: 12px; }
+.dl-swatch-note { color: var(--dl-fg); font-style: italic; }
+.dl-sample { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 4px; font-weight: 600; border: 1px solid var(--dl-border); }
+.dl-metrics { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 0.25rem 0 0.5rem; font-size: 12px; }
+.dl-metrics dt { color: var(--dl-muted); display: inline; margin-right: 0.35rem; }
+.dl-metrics dd { display: inline; margin: 0; font-family: var(--dl-mono); }
+.dl-spacing-bar { height: 0.75rem; background: var(--dl-accent); border-radius: 2px; min-width: 1px; }
+.dl-shape { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+.dl-shape-square { width: 5rem; height: 5rem; background: var(--dl-accent-soft); border: 2px solid var(--dl-accent); }
+.dl-bp { position: relative; height: 3.5rem; border: 1px solid var(--dl-border); border-radius: var(--dl-radius); background: var(--dl-surface); overflow: hidden; }
+.dl-bp-seg { position: absolute; top: 0; bottom: 0; padding: 0.4rem; border-right: 1px solid var(--dl-border); font-size: 12px; box-sizing: border-box; }
+.dl-bp-seg.is-current { background: var(--dl-accent-soft); }
+.dl-bp-marker { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--dl-accent); }
+.dl-shadow-tile { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem; border-radius: var(--dl-radius); background: var(--dl-surface); min-height: 5rem; }
+.dl-mover { position: relative; width: 12rem; height: 1.5rem; border: 1px solid var(--dl-border); border-radius: 999px; background: var(--dl-sunken); cursor: pointer; padding: 0 0.25rem; }
+.dl-mover-dot { display: block; width: 1rem; height: 1rem; border-radius: 50%; background: var(--dl-accent); }

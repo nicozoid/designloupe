@@ -4,10 +4,20 @@ import { useRoute } from "./router";
 import { Shell } from "./shell/Shell";
 import { Overview } from "./pages/Overview";
 import { NotFound } from "./pages/NotFound";
+import { Colour } from "./pages/Colour";
+import { TypographyPage } from "./pages/Typography";
+import { Layout } from "./pages/Layout";
+import { Elevation } from "./pages/Elevation";
+import { Motion } from "./pages/Motion";
 
 /** Page registry. Later tasks add entries here. */
 export const PAGES: Record<string, ComponentType> = {
   "": Overview,
+  "tokens/colour": Colour,
+  "tokens/typography": TypographyPage,
+  "tokens/layout": Layout,
+  "tokens/elevation": Elevation,
+  "tokens/motion": Motion,
 };
 
 function pageKey(segments: string[]): string {
