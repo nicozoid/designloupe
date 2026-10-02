@@ -9,6 +9,7 @@ import { TypographyPage } from "./pages/Typography";
 import { Layout } from "./pages/Layout";
 import { Elevation } from "./pages/Elevation";
 import { Motion } from "./pages/Motion";
+import { Overrides } from "./pages/Overrides";
 
 /** Page registry. Later tasks add entries here. */
 export const PAGES: Record<string, ComponentType> = {
@@ -18,11 +19,13 @@ export const PAGES: Record<string, ComponentType> = {
   "tokens/layout": Layout,
   "tokens/elevation": Elevation,
   "tokens/motion": Motion,
+  overrides: Overrides,
 };
 
 function pageKey(segments: string[]): string {
-  if (segments[0] === "tokens") return segments.slice(0, 2).join("/");
-  return segments[0] ?? "";
+  const clean = segments.map((s) => s.split("#")[0]!);
+  if (clean[0] === "tokens") return clean.slice(0, 2).join("/");
+  return clean[0] ?? "";
 }
 
 /** If the user's wrapper throws, keep the viewer usable without it. */

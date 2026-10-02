@@ -52,4 +52,6 @@ export interface AdapterBrowser {
   PreviewFrame: ComponentType<{ children: ReactNode }>;
   DefaultThemeFrame: ComponentType<{ children: ReactNode }>;
   TypographySample: ComponentType<{ variant: string; children: ReactNode }>;
+  /** A small representative render of a library component (for override before/after), or null. */
+  sampleFor(component: string, props?: Record<string, unknown>): ReactNode | null;
 }

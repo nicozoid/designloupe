@@ -5,6 +5,7 @@ import Typography from "@mui/material/Typography";
 import type { AdapterBrowser, Mode } from "@designloupe/core";
 import { readTokens, resolveColour, contrastPairs } from "./tokens";
 import { readOverrides } from "./overrides";
+import { sampleFor } from "./samples";
 
 type Obj = Record<string, unknown>;
 const defaultTheme = createTheme();
@@ -59,6 +60,7 @@ const muiBrowser: AdapterBrowser = {
   PreviewFrame,
   DefaultThemeFrame,
   TypographySample,
+  sampleFor,
 };
 
 export default muiBrowser;
