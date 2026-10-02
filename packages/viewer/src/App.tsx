@@ -10,6 +10,7 @@ import { Layout } from "./pages/Layout";
 import { Elevation } from "./pages/Elevation";
 import { Motion } from "./pages/Motion";
 import { Overrides } from "./pages/Overrides";
+import { Components } from "./pages/Components";
 
 /** Page registry. Later tasks add entries here. */
 export const PAGES: Record<string, ComponentType> = {
@@ -20,6 +21,7 @@ export const PAGES: Record<string, ComponentType> = {
   "tokens/elevation": Elevation,
   "tokens/motion": Motion,
   overrides: Overrides,
+  components: Components,
 };
 
 function pageKey(segments: string[]): string {

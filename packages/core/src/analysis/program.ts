@@ -45,6 +45,7 @@ export function createAnalysis(root: string, tsconfigPath: string): Analysis {
     shouldExtractLiteralValuesFromEnum: true,
     shouldRemoveUndefinedFromOptional: true,
     shouldIncludePropTagMap: false,
+    skipChildrenPropWithoutDoc: false, // keep `children` even without a doc comment, so demos can fill it
     propFilter: () => true,
   });
 

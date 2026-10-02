@@ -93,3 +93,13 @@ a.dl-tile:hover { border-color: var(--dl-accent); }
 .dl-before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem; }
 .dl-ba-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dl-muted); margin-bottom: 0.25rem; }
 .dl-variant { border-top: 1px solid var(--dl-border); margin-top: 1rem; padding-top: 0.5rem; }
+.dl-component h4 { margin: 0.75rem 0 0.25rem; font-size: 13px; }
+.dl-notes { border-left: 3px solid var(--dl-accent); padding-left: 0.75rem; }
+.dl-required { color: var(--dl-bad); margin-left: 0.15rem; }
+.dl-demo-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+.dl-demo-table { display: grid; gap: 1rem; }
+.dl-demo-cell { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+.dl-demo-label { font: 11px var(--dl-mono); color: var(--dl-muted); }
+.dl-needs-demo code { margin: 0 0.2rem; }
+.dl-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.25rem; }
+kbd { font: 12px var(--dl-mono); border: 1px solid var(--dl-border); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3rem; background: var(--dl-sunken); }
