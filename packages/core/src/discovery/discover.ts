@@ -4,7 +4,7 @@ import fg from "fast-glob";
 import type { ResolvedConfig } from "../config/schema";
 import type { AdapterNode } from "../adapter";
 import type { CallSite, ComponentInfo, DiscoveryModel, IconInfo, LibraryUsage, StaticFinding } from "../model";
-import { createAnalysis } from "../analysis/program";
+import { createAnalysis, type Analysis } from "../analysis/program";
 import { scanSource, type FileScan } from "../analysis/scan-file";
 import { findStaticIssues } from "../anomalies/static-rules";
 import { toPropInfo } from "./props";
@@ -12,15 +12,21 @@ import { readPackageVersion } from "./package-version";
 
 const posix = (p: string) => p.split(path.sep).join("/");
 
-export async function discover(config: ResolvedConfig, adapter: AdapterNode): Promise<DiscoveryModel> {
+export interface DiscoverDeps {
+  /** Override the TS analysis (resolve + parseProps). Defaults to `createAnalysis(root, tsconfig)`; a test seam. */
+  analysis?: Analysis;
+}
+
+export async function discover(config: ResolvedConfig, adapter: AdapterNode, deps?: DiscoverDeps): Promise<DiscoveryModel> {
   const { root } = config;
   const rel = (abs: string) => posix(path.relative(root, abs));
   const warnings: string[] = [];
-  const analysis = createAnalysis(root, config.tsconfig);
+  const analysis = deps?.analysis ?? createAnalysis(root, config.tsconfig);
   const globOpts = { cwd: root, absolute: true, ignore: [...config.ignoreGlobs, "**/node_modules/**"] };
   const componentFiles = (await fg(config.componentGlobs, globOpts)).map((f) => path.resolve(f)).sort();
   const usageFiles = (await fg(config.usageGlobs, globOpts)).map((f) => path.resolve(f)).sort();
   const componentSet = new Set(componentFiles);
+  const usageSet = new Set(usageFiles);
   if (!componentFiles.length) warnings.push(`No files matched componentGlobs (${config.componentGlobs.join(", ")}).`);
   if (!config.themeEntry) warnings.push("No themeEntry configured: token and override pages are disabled.");
 
@@ -29,24 +35,42 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode): Pr
   const getScan = (file: string): FileScan | undefined => {
     if (scans.has(file)) return scans.get(file);
     if (!fs.existsSync(file)) return undefined;
-    const s = scanSource(file, fs.readFileSync(file, "utf8"), analysis.resolve);
+    let text: string;
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch (e) {
+      warnings.push(`Could not read ${rel(file)}: ${(e as Error).message}`);
+      return undefined;
+    }
+    const s = scanSource(file, text, analysis.resolve);
     scans.set(file, s);
     return s;
   };
   for (const f of new Set([...componentFiles, ...usageFiles])) getScan(f);
 
   // ── components ──
+  // Fast path: parse all component files in one batch (shares the TS program). If docgen throws
+  // on any single file, isolate the failure by re-parsing file by file so one bad file doesn't
+  // blank out every component.
   let docs: ReturnType<typeof analysis.parseProps> = [];
   try {
     docs = analysis.parseProps(componentFiles);
-  } catch (e) {
-    warnings.push(`Props extraction failed: ${(e as Error).message}`);
+  } catch {
+    docs = [];
+    for (const file of componentFiles) {
+      try {
+        docs.push(...analysis.parseProps([file]));
+      } catch (e) {
+        warnings.push(`Props extraction failed for ${rel(file)}: ${(e as Error).message}`);
+      }
+    }
   }
 
   const components: ComponentInfo[] = [];
   const byFileExport = new Map<string, ComponentInfo>(); // `${absFile}#${exportName}`
   for (const file of componentFiles) {
-    const scan = getScan(file)!;
+    const scan = getScan(file);
+    if (!scan) continue;
     for (const doc of docs.filter((d) => path.resolve(d.filePath) === file)) {
       const exportName = scan.exports.includes(doc.displayName) ? doc.displayName : scan.exports.includes("default") ? "default" : undefined;
       if (!exportName) continue;
@@ -94,7 +118,8 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode): Pr
   // ── built-from + wraps ──
   const primitives = new Set(adapter.layoutPrimitives);
   for (const c of components) {
-    const scan = getScan(path.join(root, c.file))!;
+    const scan = getScan(path.join(root, c.file));
+    if (!scan) continue;
     const rendered = [...scan.jsx.map((j) => j.tag), ...scan.styledTargets];
     const library: string[] = [];
     const own: string[] = [];
@@ -150,7 +175,7 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode): Pr
   // ── static findings ──
   const findings: StaticFinding[] = [];
   for (const scan of scans.values()) {
-    if (!componentSet.has(scan.file) && !usageFiles.includes(scan.file)) continue; // skip barrels pulled in on demand
+    if (!componentSet.has(scan.file) && !usageSet.has(scan.file)) continue; // skip barrels pulled in on demand
     findings.push(...findStaticIssues(rel(scan.file), fs.readFileSync(scan.file, "utf8")));
   }
 
