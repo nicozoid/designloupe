@@ -34,12 +34,13 @@ export function scanSource(
       const add = (local: string, imported: string) =>
         out.imports.push(resolvedFile ? { local, imported, specifier, resolvedFile } : { local, imported, specifier });
       const clause = stmt.importClause;
-      if (!clause) continue;
+      // `import type …` / `{ type X }` never render: they would only add phantom icons and usages.
+      if (!clause || clause.isTypeOnly) continue;
       if (clause.name) add(clause.name.text, "default");
       const nb = clause.namedBindings;
       if (nb && ts.isNamespaceImport(nb)) add(nb.name.text, "*");
       if (nb && ts.isNamedImports(nb))
-        for (const el of nb.elements) add(el.name.text, (el.propertyName ?? el.name).text);
+        for (const el of nb.elements) if (!el.isTypeOnly) add(el.name.text, (el.propertyName ?? el.name).text);
     }
     // exports
     const mods = ts.canHaveModifiers(stmt) ? ts.getModifiers(stmt) : undefined;

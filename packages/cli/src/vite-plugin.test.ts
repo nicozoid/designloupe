@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import type { DiscoveryModel } from "@designloupe/core";
-import { sameModel, shouldRediscover, within } from "./vite-plugin";
+import type { DiscoveryModel, ResolvedConfig } from "@designloupe/core";
+import { loupePlugin, sameModel, shouldRediscover, within } from "./vite-plugin";
 
 const root = path.join(path.sep, "work", "app");
 const loupeDir = path.join(path.sep, "work", "app-loupe");
@@ -35,5 +35,21 @@ describe("sameModel", () => {
   it("ignores generatedAt but notices real changes", () => {
     expect(sameModel(model, { ...model, generatedAt: "2026-10-03T00:00:00Z" })).toBe(true);
     expect(sameModel(model, { ...model, name: "B" })).toBe(false);
+  });
+});
+
+describe("virtual:loupe/icons", () => {
+  const config = { root, presets: [], shims: {}, configDir: loupeDir, adapter: "mui", themeExport: "theme" } as unknown as ResolvedConfig;
+  const icon = (name: string) => ({ name, source: "library" as const, importPath: "@mui/icons-material", sites: [] });
+  const model = { components: [], icons: [icon("Delete"), icon("NotAnIcon")] } as unknown as DiscoveryModel;
+
+  it("turns an icon that won't resolve into a rejected import instead of breaking the whole module", async () => {
+    const plugin = loupePlugin({ config, model, rediscover: async () => model });
+    const ctx = { resolve: async (id: string) => (id.endsWith("/Delete") ? { id: "/nm/Delete.js" } : null) };
+    const load = plugin.load as unknown as (this: typeof ctx, id: string) => Promise<string>;
+    const code = await load.call(ctx, "\0virtual:loupe/icons");
+    expect(code).toContain(`"Delete": () => import("@mui/icons-material/Delete")`);
+    expect(code).not.toContain(`import("@mui/icons-material/NotAnIcon")`);
+    expect(code).toContain(`"NotAnIcon": () => Promise.reject(new Error("Could not resolve @mui/icons-material/NotAnIcon"))`);
   });
 });

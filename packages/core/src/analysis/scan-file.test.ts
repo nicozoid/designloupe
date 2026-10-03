@@ -19,7 +19,6 @@ describe("scanSource", () => {
     const s = scanSource("/r/src/x.tsx", src, (spec) => (spec === "./StatusPill" ? "/r/src/StatusPill.tsx" : undefined));
     expect(s.imports).toEqual([
       { local: "Button", imported: "default", specifier: "@mui/material/Button" },
-      { local: "ButtonProps", imported: "ButtonProps", specifier: "@mui/material/Button" },
       { local: "MuiCard", imported: "Card", specifier: "@mui/material" },
       { local: "Typography", imported: "Typography", specifier: "@mui/material" },
       { local: "Icons", imported: "*", specifier: "@mui/icons-material" },
@@ -41,5 +40,11 @@ describe("scanSource", () => {
       { exported: "*", imported: "*", specifier: "./InfoCard", resolvedFile: "/r/src/InfoCard.tsx" },
     ]);
     expect(s.exports).toEqual(["Btn"]);
+  });
+
+  it("skips type-only imports (they never render and must not count as icons or usages)", () => {
+    const text = `import type { SvgIconComponent } from "@mui/icons-material";\nimport { type ChipProps, Chip } from "@mui/material";\nimport type Theme from "./theme";\n`;
+    const s = scanSource("/r/src/x.tsx", text);
+    expect(s.imports).toEqual([{ local: "Chip", imported: "Chip", specifier: "@mui/material" }]);
   });
 });

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import fg from "fast-glob";
-import type { Plugin, ViteDevServer } from "vite";
+import type { Plugin, Rollup, ViteDevServer } from "vite";
 import type { DiscoveryModel, ResolvedConfig } from "@designloupe/core";
 import { NEXT_SHIMS_DIR, REPO_ROOT } from "./paths";
 import { rewriteNextFontImports } from "./next-font";
@@ -83,10 +83,16 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
     };
   };
 
-  const modules: Record<string, () => string> = {
+  // One unresolvable dynamic-import literal fails Vite's import analysis for the WHOLE module, so entries that
+  // might not resolve become rejected promises: the failure then stays with that one entry.
+  const reject = (what: string) => `() => Promise.reject(new Error(${JSON.stringify(`Could not resolve ${what}`)}))`;
+  const modules: Record<string, (ctx: Rollup.PluginContext) => string | Promise<string>> = {
     model: () => `export default ${JSON.stringify(model)};`,
     components: () => {
-      const entries = model.components.map((c) => `  ${JSON.stringify(c.id)}: ${imp(path.join(root, c.file))},`);
+      const entries = model.components.map((c) => {
+        const file = path.join(root, c.file);
+        return `  ${JSON.stringify(c.id)}: ${fs.existsSync(file) ? imp(file) : reject(c.file)},`;
+      });
       return `export default {\n${entries.join("\n")}\n};`;
     },
     theme: () => {
@@ -111,11 +117,17 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
       ].join("\n");
     },
     adapter: () => `export { default } from "@designloupe/adapter-${config.adapter}/browser";`,
-    icons: () => {
+    icons: async (ctx) => {
       // Library icons by per-icon module path (barrel imports are huge); custom icons come via virtual:loupe/components.
       const lib = model.icons.filter((i) => i.source === "library");
       const spec = (i: (typeof lib)[number]) => (i.importPath.endsWith(`/${i.name}`) ? i.importPath : `${i.importPath}/${i.name}`);
-      const entries = lib.map((i) => `  ${JSON.stringify(i.name)}: () => import(${JSON.stringify(spec(i))}),`);
+      const entries = await Promise.all(
+        lib.map(async (i) => {
+          const s = spec(i);
+          const ok = await ctx.resolve(s, anchor).catch(() => null);
+          return `  ${JSON.stringify(i.name)}: ${ok ? `() => import(${JSON.stringify(s)})` : reject(s)},`;
+        }),
+      );
       return `export default {\n${entries.join("\n")}\n};`;
     },
     "next-font": () => `export const loupeFont = () => ({ className: "", variable: "", style: { fontFamily: "inherit" } });`,
@@ -191,7 +203,7 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
     load(id) {
       if (!id.startsWith(`\0${PREFIX}`)) return null;
       const make = modules[id.slice(1 + PREFIX.length)];
-      return make ? make() : null;
+      return make ? make(this) : null;
     },
     transform(code, id) {
       if (!config.presets.includes("next") || id.includes(nm)) return null;
