@@ -2,15 +2,29 @@ import { useEffect, useMemo, useState } from "react";
 import components from "virtual:loupe/components";
 import {
   buildAnomaly, categoryInfo, contrastAnomaly, findingsToAnomalies, mergeAnomalies, statusInfo,
-  type Anomaly, type AnomalyStatus,
+  type Anomaly, type AnomalyStatus, type ComponentInfo,
 } from "@designloupe/core";
 import { useLoupe } from "../state";
 import { PageHeader } from "../ui/PageHeader";
 import { Badge, type Tone } from "../ui/Badge";
 import { CopyChip } from "../ui/CopyChip";
 import { measurePair } from "./Colour";
+import { runLimited } from "../limit";
 
 const TONE: Record<string, Tone> = { warn: "warn", info: "accent", good: "good", muted: "neutral" };
+
+/** Probe every component's import once per page session, bounded so we never fire
+ * hundreds of dynamic imports through Vite's transform pipeline at once. */
+let probed: Promise<void> | null = null;
+function probeImports(all: ComponentInfo[], reportFailure: (id: string, message: string) => void): Promise<void> {
+  if (!probed) {
+    probed = runLimited(
+      all.map((c) => () => (components[c.id]?.() ?? Promise.resolve()).catch((e: Error) => reportFailure(c.id, `import: ${e.message}`))),
+      6,
+    ).then(() => undefined);
+  }
+  return probed;
+}
 
 export function Anomalies() {
   const { model, adapter, theme, failures, reportFailure, authoredAnomalies } = useLoupe();
@@ -18,7 +32,7 @@ export function Anomalies() {
 
   // Surface import failures without visiting every component page.
   useEffect(() => {
-    for (const c of model.components) components[c.id]?.().catch((e: Error) => reportFailure(c.id, `import: ${e.message}`));
+    probeImports(model.components, reportFailure);
   }, [model.components, reportFailure]);
 
   const all = useMemo(() => {
