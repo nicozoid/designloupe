@@ -5,7 +5,7 @@ import path from "node:path";
 import type { ViteDevServer } from "vite";
 import type { ResolvedConfig } from "@designloupe/core";
 import { loadConfig } from "@designloupe/core/node";
-import { createLoupeServer, isRedundantTsconfigPathsWarning } from "./server";
+import { broadConfigDirWarning, createLoupeServer, isRedundantTsconfigPathsWarning } from "./server";
 import { REPO_ROOT } from "./paths";
 
 describe("isRedundantTsconfigPathsWarning", () => {
@@ -21,6 +21,14 @@ describe("isRedundantTsconfigPathsWarning", () => {
     expect(isRedundantTsconfigPathsWarning("Some other warning about tsconfigPaths resolution failing")).toBe(false);
     expect(isRedundantTsconfigPathsWarning('The plugin "vite-tsconfig-paths" crashed while loading')).toBe(false);
     expect(isRedundantTsconfigPathsWarning("Nothing to see here")).toBe(false);
+  });
+});
+
+describe("broadConfigDirWarning", () => {
+  it("warns when the config folder is the home folder or the filesystem root, since Vite may then serve all of it", () => {
+    expect(broadConfigDirWarning(os.homedir())).toMatch(/home folder/);
+    expect(broadConfigDirWarning(path.parse(process.cwd()).root)).toMatch(/filesystem root/);
+    expect(broadConfigDirWarning(path.join(os.homedir(), "loupe", "app"))).toBeUndefined();
   });
 });
 

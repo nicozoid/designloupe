@@ -17,12 +17,13 @@ It never writes to your repo. MUI (v7+) is supported today. The core is library-
 
 ## Quick start
 
-Requires Node 22+.
+Requires Node 22+. Runs on macOS and Linux; Windows is untested.
 
 ```bash
 git clone <this repo> designloupe && cd designloupe
 npm install
-npm run loupe:fixture        # opens the bundled example app at http://localhost:5179
+npm run loupe:fixture        # serves the bundled example app at http://localhost:5179
+npm run loupe:fixture -- --open   # …and opens it in your browser
 ```
 
 ## Use it on your app
@@ -54,6 +55,12 @@ Next steps:
 - `docs/loupe-files.md`: hand-written demos, notes, tiers, accessibility checks, anomalies and token notes.
 - `docs/adapters.md`: how the MUI adapter is built, and how to add another library.
 - `docs/claude/onboarding-a-target.md`: a step-by-step playbook. If you use Claude Code, ask it to follow this file.
+
+## Security
+
+Loupe runs the target's code: `dev` loads its theme and components in your browser, and `doctor` imports
+them in Node with your user's permissions. Only point Loupe at repos you trust, as you would before running
+their own dev server.
 
 ## Development
 

@@ -4,7 +4,7 @@ Goal: get Design Loupe running against an app the user has on this machine, **wi
 repo**. Work through the steps in order. After each step, tell the user what you found in a sentence or two.
 
 ## 0. Prerequisites
-- In this repo: `npm install`, then `npm test`. All tests should pass. If they don't, stop and report.
+- In this repo: `npm ci` (installs exactly what `package-lock.json` pins), then `npm test`. All tests should pass. If they don't, stop and report.
 - Ask the user for the target repo's absolute path, and where they'd like the Loupe config folder to live. Default: `~/loupe/<app-name>/`, outside both repos.
 - In the target repo, check `node_modules` exists. If not, ask the user before running its install command, since installs can run scripts.
 
