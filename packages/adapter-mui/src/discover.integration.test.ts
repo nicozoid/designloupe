@@ -58,6 +58,12 @@ describe("discover(fixture)", () => {
     expect(byName("SparkIcon").isIcon).toBe(true);
   });
 
+  it("follows a barrel inside componentGlobs instead of counting it as a second component", () => {
+    // src/components/icons/index.tsx re-exports SparkIcon; Dashboard imports it from "@/components/icons".
+    expect(model.components.filter((c) => c.name === "SparkIcon").map((c) => c.id)).toEqual(["src/components/icons/SparkIcon.tsx#SparkIcon"]);
+    expect(byName("SparkIcon").usages.map((u) => u.file)).toEqual(["src/features/Dashboard.tsx"]);
+  });
+
   it("collects the planted static findings", () => {
     const f = model.findings.map((x) => `${x.file}|${x.rule}|${x.snippet}`).sort();
     expect(f).toEqual([

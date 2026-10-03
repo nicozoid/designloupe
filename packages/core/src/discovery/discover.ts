@@ -74,6 +74,9 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode, dep
     for (const doc of docs.filter((d) => path.resolve(d.filePath) === file)) {
       const exportName = scan.exports.includes(doc.displayName) ? doc.displayName : scan.exports.includes("default") ? "default" : undefined;
       if (!exportName) continue;
+      // A barrel (`export { Button } from "./Button"`): docgen documents the re-export at the barrel's path, but the
+      // component is defined elsewhere. Imports through the barrel are followed back to it by resolveExport.
+      if (scan.reExports.some((re) => re.exported === exportName)) continue;
       const relFile = rel(file);
       const { props, inheritedPropCount } = toPropInfo(doc);
       const c: ComponentInfo = {

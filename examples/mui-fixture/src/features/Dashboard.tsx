@@ -3,7 +3,7 @@ import { styled } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { InfoCard } from "@/components/InfoCard";
-import { SparkIcon } from "@/components/icons/SparkIcon";
+import { SparkIcon } from "@/components/icons";
 
 const Note = styled("div")({ color: "rgb(10, 20, 30)" });
 

@@ -28,6 +28,14 @@ resolved relative to the **config file's directory**. `themeEntry`, `componentGl
 and `tsconfig` are resolved relative to `root`. This lets the config folder and the target repo move
 independently of each other.
 
+## Barrels (`index.ts` re-exports)
+
+A barrel such as `Button/index.ts` containing `export { Button } from "./Button"` is fine inside
+`componentGlobs`: re-exports are not counted as components, and imports through the barrel
+(`import { Button } from "@/components/Button"`) are followed back to the file that defines the component,
+so its usages land on that component. The globs must still match the defining files themselves
+(`Button/Button.tsx`), not only the barrels.
+
 ## Theme export
 
 `themeExport` must name either a theme object, or a zero-argument function that returns one (checked by
