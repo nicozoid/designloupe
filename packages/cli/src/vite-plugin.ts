@@ -60,7 +60,10 @@ export function sameModel(a: DiscoveryModel, b: DiscoveryModel): boolean {
   return JSON.stringify({ ...a, generatedAt: "" }) === JSON.stringify({ ...b, generatedAt: "" });
 }
 
-export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryModel; rediscover: () => Promise<DiscoveryModel> }): Plugin {
+/** Re-run discovery. `structural`: files were added or removed since the last run (not just saved). */
+export type Rediscover = (structural: boolean) => Promise<DiscoveryModel>;
+
+export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryModel; rediscover: Rediscover }): Plugin {
   const { config } = opts;
   let model = opts.model;
   // Real paths: Vite hands us symlink-resolved importers (e.g. macOS /tmp is /private/tmp).
@@ -145,15 +148,20 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
 
   let timer: NodeJS.Timeout | undefined;
   let generation = 0;
+  let structural = false; // an add/unlink arrived since the last run started
   const watch = (server: ViteDevServer) => {
-    const onChange = (file: string) => {
+    if (config.watch === false) return;
+    const onEvent = (kind: "add" | "unlink" | "change") => (file: string) => {
       if (!shouldRediscover(real(file), { root, loupeDir, extra: extraDirs })) return;
+      if (kind !== "change") structural = true;
       clearTimeout(timer);
       timer = setTimeout(async () => {
         const gen = ++generation;
+        const wasStructural = structural;
+        structural = false;
         let next: DiscoveryModel;
         try {
-          next = await opts.rediscover();
+          next = await opts.rediscover(wasStructural);
         } catch (e) {
           server.config.logger.error(`[designloupe] rediscovery failed: ${(e as Error).message}`);
           return;
@@ -171,7 +179,7 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
       }, 300);
     };
     server.watcher.add([root, ...(loupeDir ? [loupeDir] : []), ...extraDirs]);
-    server.watcher.on("add", onChange).on("unlink", onChange).on("change", onChange);
+    server.watcher.on("add", onEvent("add")).on("unlink", onEvent("unlink")).on("change", onEvent("change"));
   };
 
   return {

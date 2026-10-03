@@ -21,6 +21,7 @@ describe("loadConfig", () => {
     expect(c.usageGlobs).toEqual(["src/**/*.{ts,tsx,js,jsx}"]);
     expect(c.ignoreGlobs).toContain("**/*.stories.*");
     expect(c.presets).toEqual([]);
+    expect(c.watch).toBe(true);
     expect(c.configDir).toBe(dir);
   });
 

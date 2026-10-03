@@ -19,6 +19,7 @@ export const ConfigSchema = z.object({
   presets: z.array(z.enum(PRESETS)).default([]),
   loupeDir: z.string().optional(),
   define: z.record(z.string(), z.string()).default({}),
+  watch: z.boolean().default(true),
   vite: z.record(z.string(), z.any()).optional(),
 });
 

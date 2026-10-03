@@ -110,7 +110,7 @@ describe("loupe server with an out-of-repo target", () => {
       name: "Stub", root: target, adapter: "mui", themeExport: "theme",
       componentGlobs: ["src/components/**/*.tsx"], ignoreGlobs: [], usageGlobs: ["src/**/*.tsx"],
       tsconfig: path.join(target, "tsconfig.json"), wrapper: path.join(cfgDir, "Wrapper.tsx"),
-      shims: {}, presets: [], define: {},
+      shims: {}, presets: [], define: {}, watch: true,
       configPath: path.join(cfgDir, "loupe.config.ts"), configDir: cfgDir, loupeDir: cfgDir,
       // No prebundling (stubs aren't real packages) and no HMR socket (the fixture server above holds the port).
       vite: { optimizeDeps: { noDiscovery: true }, server: { ws: false } },

@@ -3,7 +3,7 @@ import { createLogger, createServer, mergeConfig, searchForWorkspaceRoot, type I
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import fs from "node:fs";
-import { discover } from "@designloupe/core/node";
+import { createAnalysis, createDiscoverCache, discover } from "@designloupe/core/node";
 import type { ResolvedConfig } from "@designloupe/core";
 import muiNode from "@designloupe/adapter-mui/node";
 import { globDirs, loupePlugin, optimizeEntries } from "./vite-plugin";
@@ -41,8 +41,12 @@ export async function createLoupeServer(
   opts: { port?: number; open?: boolean; middlewareMode?: boolean } = {},
 ): Promise<ViteDevServer> {
   const adapter = muiNode; // only adapter for now; config.adapter is validated as "mui"
-  const rediscover = () => discover(config, adapter);
-  const model = await rediscover();
+  // One analysis (compiler options, host, resolution cache) and one cache for the server's lifetime: a save only
+  // rescans changed files, and only re-runs docgen when a component file (or a file one imports) changed.
+  const analysis = createAnalysis(config.root, config.tsconfig);
+  const cache = createDiscoverCache();
+  const rediscover = (structural: boolean) => discover(config, adapter, { analysis, cache, structural });
+  const model = await rediscover(true);
 
   const base: InlineConfig = {
     configFile: false,

@@ -64,3 +64,23 @@ describe("virtual:loupe/icons", () => {
     expect(code).toContain(`"NotAnIcon": () => Promise.reject(new Error("Could not resolve @mui/icons-material/NotAnIcon"))`);
   });
 });
+
+describe("watching", () => {
+  const config = { root, componentGlobs: ["src/**/*.tsx"], presets: [], shims: {}, configDir: loupeDir, adapter: "mui", themeExport: "theme" } as unknown as ResolvedConfig;
+  const model = { components: [], icons: [] } as unknown as DiscoveryModel;
+  const fakeServer = () => {
+    const on: string[] = [];
+    const watcher = { add: () => watcher, on: (ev: string) => (on.push(ev), watcher) };
+    return { on, server: { watcher } };
+  };
+  const configure = (c: ResolvedConfig) => {
+    const f = fakeServer();
+    (loupePlugin({ config: c, model, rediscover: async () => model }).configureServer as (s: unknown) => void)(f.server);
+    return f.on;
+  };
+
+  it("rediscovers on file events by default, and not at all with watch: false", () => {
+    expect(configure({ ...config, watch: true })).toEqual(["add", "unlink", "change"]);
+    expect(configure({ ...config, watch: false })).toEqual([]);
+  });
+});

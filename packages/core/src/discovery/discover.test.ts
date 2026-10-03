@@ -6,7 +6,8 @@ import type { ResolvedConfig } from "../config/schema";
 import { loadConfig } from "../config/load";
 import { createAnalysis, type Analysis } from "../analysis/program";
 import type { AdapterNode } from "../adapter";
-import { discover } from "./discover";
+import type { DiscoveryModel } from "../model";
+import { createDiscoverCache, discover, needsDocgen } from "./discover";
 
 const configPath = path.resolve(import.meta.dirname, "../../../../examples/fixture-loupe/loupe.config.ts");
 
@@ -73,7 +74,7 @@ describe("discover: monorepo workspace package", () => {
       const config = {
         name: "Mono", root, adapter: "mui", themeExport: "theme",
         componentGlobs: ["../../packages/ui/src/**/*.tsx"], ignoreGlobs: [], usageGlobs: ["src/**/*.tsx"],
-        tsconfig: path.join(root, "tsconfig.json"), shims: {}, presets: [], define: {},
+        tsconfig: path.join(root, "tsconfig.json"), shims: {}, presets: [], define: {}, watch: false,
         configPath: path.join(tmp, "loupe.config.ts"), configDir: tmp,
       } as ResolvedConfig;
       const model = await discover(config, fakeAdapter);
@@ -82,5 +83,59 @@ describe("discover: monorepo workspace package", () => {
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+  }, 120_000);
+});
+
+describe("discover: reuse between runs", () => {
+  const stamps = new Map([["/r/A.tsx", "1:10"], ["/r/B.tsx", "1:20"], ["/r/types.ts", "1:5"], ["/r/feature.tsx", "1:7"]]);
+  const prev = { componentFiles: ["/r/A.tsx", "/r/B.tsx"], inputs: new Map([["/r/A.tsx", "1:10"], ["/r/B.tsx", "1:20"], ["/r/types.ts", "1:5"]]), docs: [], warnings: [] };
+  const stampOf = (over: Record<string, string> = {}) => (f: string) => over[f] ?? stamps.get(f) ?? "missing";
+
+  it("re-runs docgen only when a component file, or a file one imports, changed or the component list changed", () => {
+    expect(needsDocgen(undefined, prev.componentFiles, stampOf())).toBe(true);
+    expect(needsDocgen(prev, prev.componentFiles, stampOf())).toBe(false);
+    expect(needsDocgen(prev, prev.componentFiles, stampOf({ "/r/feature.tsx": "2:7" }))).toBe(false); // usage-only file
+    expect(needsDocgen(prev, prev.componentFiles, stampOf({ "/r/B.tsx": "2:21" }))).toBe(true);
+    expect(needsDocgen(prev, prev.componentFiles, stampOf({ "/r/types.ts": "2:6" }))).toBe(true); // imported props type
+    expect(needsDocgen(prev, ["/r/A.tsx"], stampOf())).toBe(true);
+    expect(needsDocgen(prev, [...prev.componentFiles, "/r/C.tsx"], stampOf())).toBe(true);
+  });
+
+  it("reuses props and scans when nothing they depend on changed, with identical results", async () => {
+    const config = await loadConfig(configPath);
+    const real = createAnalysis(config.root, config.tsconfig);
+    let docgenRuns = 0;
+    let invalidations = 0;
+    const counting: Analysis = {
+      resolve: real.resolve,
+      parseProps: (files) => (docgenRuns++, real.parseProps(files)),
+      invalidate: () => invalidations++,
+    };
+    const cache = createDiscoverCache();
+    const strip = (m: DiscoveryModel) => ({ ...m, generatedAt: "" });
+
+    const first = await discover(config, fakeAdapter, { analysis: counting, cache });
+    expect(docgenRuns).toBe(1);
+    const second = await discover(config, fakeAdapter, { analysis: counting, cache, structural: false });
+    expect(docgenRuns).toBe(1);
+    expect(strip(second)).toEqual(strip(first));
+
+    // A component file was saved: docgen runs again.
+    const file = path.join(config.root, "src/components/PrimaryButton.tsx");
+    const { atime, mtime } = fs.statSync(file);
+    try {
+      fs.utimesSync(file, atime, new Date(mtime.getTime() + 5000));
+      const third = await discover(config, fakeAdapter, { analysis: counting, cache, structural: false });
+      expect(docgenRuns).toBe(2);
+      expect(strip(third)).toEqual(strip(first));
+    } finally {
+      fs.utimesSync(file, atime, mtime);
+    }
+
+    // A file was added or removed: resolution may differ, so everything is redone.
+    const before = invalidations;
+    await discover(config, fakeAdapter, { analysis: counting, cache, structural: true });
+    expect(docgenRuns).toBe(3);
+    expect(invalidations).toBe(before + 1);
   }, 120_000);
 });

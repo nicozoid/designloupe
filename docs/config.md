@@ -19,6 +19,7 @@
 | `presets` | `("next")[]` | `[]` | — | Named bundles of shims/behaviour. Only `"next"` exists today. |
 | `loupeDir` | `string` (optional) | *(none)* | config dir | Folder scanned for `*.loupe.{ts,tsx}`, `anomalies.{ts,tsx}` and `tokens.{ts,tsx}`. Often the config dir itself (`"."`). |
 | `define` | `Record<string, string>` | `{}` | — | Extra `vite` `define` entries (merged after Loupe's own `process.env.NODE_ENV`, etc.), e.g. `{ "process.env.API_URL": '"https://example.test"' }`. |
+| `watch` | `boolean` | `true` | — | Re-run discovery when source files in the target (or the folders `componentGlobs` reach) or `loupeDir` change, and reload the browser if the model changed. A save only rescans changed files and only re-runs prop extraction when a component file, or a file one imports, changed. Set `false` on a very large repo if saves feel slow; restart the dev server to pick up new components. |
 | `vite` | `object` (optional) | *(none)* | — | Raw Vite config, merged onto Loupe's own with `mergeConfig` (your plugins/resolve/etc. are added, not replaced). |
 
 ## Path resolution

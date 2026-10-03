@@ -6,6 +6,8 @@ import * as docgen from "react-docgen-typescript";
 export interface Analysis {
   resolve(specifier: string, fromFile: string): string | undefined;
   parseProps(files: string[]): docgen.ComponentDoc[];
+  /** Forget cached module resolutions (after files were added or removed). */
+  invalidate?(): void;
 }
 
 const FALLBACK: ts.CompilerOptions = {
@@ -64,5 +66,5 @@ export function createAnalysis(root: string, tsconfigPath: string): Analysis {
     propFilter: () => true,
   });
 
-  return { resolve, parseProps: (files) => parser.parse(files) };
+  return { resolve, parseProps: (files) => parser.parse(files), invalidate: () => cache.clear() };
 }

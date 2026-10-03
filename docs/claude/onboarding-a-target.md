@@ -38,7 +38,8 @@ Create:
 
 The dev server watches the target and `loupeDir` for source changes (ignoring dot-directories and
 `node_modules`/`dist`/`build`/`out`/`coverage`) and only triggers a full browser reload when discovery
-actually produces a different model — ordinary edits are left to Vite's normal HMR. Editing `tsconfig.json`
+actually produces a different model — ordinary edits are left to Vite's normal HMR. Set `watch: false` in the
+config if saves feel slow on a very large repo (then restart the dev server to pick up new components). Editing `tsconfig.json`
 or `package.json` in the target is **not** watched; restart the dev server after changing either.
 
 ## 5. Fix failures (troubleshooting)

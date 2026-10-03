@@ -12,9 +12,44 @@ import { readPackageVersion } from "./package-version";
 
 const posix = (p: string) => p.split(path.sep).join("/");
 
+type ComponentDoc = ReturnType<Analysis["parseProps"]>[number];
+
+/** What one discovery run leaves behind for the next (the dev server re-runs discovery on every save). */
+export interface DiscoverCache {
+  /** File scans, keyed by file, with the file's stamp when scanned. */
+  scans: Map<string, { stamp: string; scan: FileScan }>;
+  /** The last docgen result and the stamps of the files it read (component files and the files they import). */
+  docgen?: DocgenResult;
+}
+export interface DocgenResult { componentFiles: string[]; inputs: Map<string, string>; docs: ComponentDoc[]; warnings: string[] }
+
+export const createDiscoverCache = (): DiscoverCache => ({ scans: new Map() });
+
+/** mtime + size: changes whenever a save changes the file. */
+export function fileStamp(file: string): string {
+  try {
+    const s = fs.statSync(file);
+    return `${s.mtimeMs}:${s.size}`;
+  } catch {
+    return "missing";
+  }
+}
+
+/** Docgen (the slow part) only needs re-running when a component file, or a file one imports, changed, or the component list did. */
+export function needsDocgen(prev: DocgenResult | undefined, componentFiles: string[], stampOf: (file: string) => string): boolean {
+  if (!prev) return true;
+  if (prev.componentFiles.length !== componentFiles.length || prev.componentFiles.some((f, i) => f !== componentFiles[i])) return true;
+  for (const [file, stamp] of prev.inputs) if (stampOf(file) !== stamp) return true;
+  return false;
+}
+
 export interface DiscoverDeps {
-  /** Override the TS analysis (resolve + parseProps). Defaults to `createAnalysis(root, tsconfig)`; a test seam. */
+  /** Override the TS analysis (resolve + parseProps). Defaults to `createAnalysis(root, tsconfig)`; also lets the dev server reuse one across runs. */
   analysis?: Analysis;
+  /** Reuse scans and props from earlier runs where the files they came from haven't changed. */
+  cache?: DiscoverCache;
+  /** Files may have been added or removed since the last run (default true): resolutions, scans and props are all redone. */
+  structural?: boolean;
 }
 
 export async function discover(config: ResolvedConfig, adapter: AdapterNode, deps?: DiscoverDeps): Promise<DiscoveryModel> {
@@ -22,6 +57,13 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode, dep
   const rel = (abs: string) => posix(path.relative(root, abs));
   const warnings: string[] = [];
   const analysis = deps?.analysis ?? createAnalysis(root, config.tsconfig);
+  const cache = deps?.cache;
+  if (cache && deps?.structural !== false) {
+    // An added or removed file can change what any import resolves to: start over.
+    analysis.invalidate?.();
+    cache.scans.clear();
+    cache.docgen = undefined;
+  }
   const globOpts = { cwd: root, absolute: true, ignore: [...config.ignoreGlobs, "**/node_modules/**"] };
   const componentFiles = (await fg(config.componentGlobs, globOpts)).map((f) => path.resolve(f)).sort();
   const usageFiles = (await fg(config.usageGlobs, globOpts)).map((f) => path.resolve(f)).sort();
@@ -35,6 +77,12 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode, dep
   const getScan = (file: string): FileScan | undefined => {
     if (scans.has(file)) return scans.get(file);
     if (!fs.existsSync(file)) return undefined;
+    const stamp = fileStamp(file);
+    const cached = cache?.scans.get(file);
+    if (cached && cached.stamp === stamp) {
+      scans.set(file, cached.scan);
+      return cached.scan;
+    }
     let text: string;
     try {
       text = fs.readFileSync(file, "utf8");
@@ -44,6 +92,7 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode, dep
     }
     const s = scanSource(file, text, analysis.resolve);
     scans.set(file, s);
+    cache?.scans.set(file, { stamp, scan: s });
     return s;
   };
   for (const f of new Set([...componentFiles, ...usageFiles])) getScan(f);
@@ -52,19 +101,33 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode, dep
   // Fast path: parse all component files in one batch (shares the TS program). If docgen throws
   // on any single file, isolate the failure by re-parsing file by file so one bad file doesn't
   // blank out every component.
-  let docs: ReturnType<typeof analysis.parseProps> = [];
-  try {
-    docs = analysis.parseProps(componentFiles);
-  } catch {
-    docs = [];
+  const runDocgen = (): DocgenResult => {
+    const docgenWarnings: string[] = [];
+    // Stamp the inputs before reading them, so a save during docgen is picked up by the next run.
+    const inputs = new Map<string, string>();
     for (const file of componentFiles) {
-      try {
-        docs.push(...analysis.parseProps([file]));
-      } catch (e) {
-        warnings.push(`Props extraction failed for ${rel(file)}: ${(e as Error).message}`);
+      inputs.set(file, fileStamp(file));
+      for (const b of getScan(file)?.imports ?? []) if (b.resolvedFile) inputs.set(b.resolvedFile, fileStamp(b.resolvedFile));
+    }
+    let docs: ComponentDoc[] = [];
+    try {
+      docs = analysis.parseProps(componentFiles);
+    } catch {
+      docs = [];
+      for (const file of componentFiles) {
+        try {
+          docs.push(...analysis.parseProps([file]));
+        } catch (e) {
+          docgenWarnings.push(`Props extraction failed for ${rel(file)}: ${(e as Error).message}`);
+        }
       }
     }
-  }
+    return { componentFiles, inputs, docs, warnings: docgenWarnings };
+  };
+  const docgenResult = cache && !needsDocgen(cache.docgen, componentFiles, fileStamp) ? cache.docgen! : runDocgen();
+  if (cache) cache.docgen = docgenResult;
+  const docs = docgenResult.docs;
+  warnings.push(...docgenResult.warnings);
 
   const components: ComponentInfo[] = [];
   const byFileExport = new Map<string, ComponentInfo>(); // `${absFile}#${exportName}`
