@@ -2,8 +2,16 @@
   "name": "@designloupe/cli",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicozoid/designloupe.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
-  "bin": { "designloupe": "./src/bin.ts" },
+  "bin": {
+    "designloupe": "./src/bin.ts"
+  },
   "dependencies": {
     "@designloupe/core": "0.1.0",
     "@designloupe/adapter-mui": "0.1.0",

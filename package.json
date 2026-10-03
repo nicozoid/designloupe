@@ -1,8 +1,16 @@
 {
   "name": "designloupe",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicozoid/designloupe.git"
+  },
   "type": "module",
-  "workspaces": ["packages/*", "examples/*"],
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "scripts": {
     "loupe": "tsx packages/cli/src/bin.ts",
     "loupe:fixture": "tsx packages/cli/src/bin.ts dev --config examples/fixture-loupe/loupe.config.ts",
@@ -20,5 +28,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

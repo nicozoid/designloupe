@@ -1527,7 +1527,7 @@ export const defineAnomalies = (a: Anomaly[]) => a;
 export const defineTokenNotes = (n: TokenNotes) => n;
 ```
 
-`packages/core/src/a11y/wcag-meta.ts`: copy `~/dev/trains2somewhere/packages/design-system/src/registry/wcag-meta.ts` verbatim, then replace the top doc comment's "shared by both apps" with "shared by every target". (Task 5 needs it; it's created now because `loupe-files.ts` imports `ApgPattern`.)
+`packages/core/src/a11y/wcag-meta.ts`: copy trains2somewhere's `packages/design-system/src/registry/wcag-meta.ts` verbatim, then replace the top doc comment's "shared by both apps" with "shared by every target". (Task 5 needs it; it's created now because `loupe-files.ts` imports `ApgPattern`.)
 
 `packages/core/src/anomalies/codes.ts`:
 ```ts
@@ -1635,7 +1635,7 @@ export function mergeAnomalies(auto: Anomaly[], authored: Anomaly[]): Anomaly[] 
 }
 ```
 
-`packages/core/src/anomalies/meta.ts`: copy `~/dev/trains2somewhere/packages/design-system/src/registry/anomaly-meta.ts`. Change the import to `import type { AnomalyCategory, AnomalyStatus } from "../loupe-files";`. Replace the `typography` description with `"Inline font sizes/weights instead of typography variants."`, replace `external` with `"Anomalies outside this codebase — third-party styles or config."`, and add:
+`packages/core/src/anomalies/meta.ts`: copy trains2somewhere's `packages/design-system/src/registry/anomaly-meta.ts`. Change the import to `import type { AnomalyCategory, AnomalyStatus } from "../loupe-files";`. Replace the `typography` description with `"Inline font sizes/weights instead of typography variants."`, replace `external` with `"Anomalies outside this codebase — third-party styles or config."`, and add:
 ```ts
   build: {
     name: "Build",
@@ -1772,7 +1772,7 @@ export function planAutoDemo(c: { name: string; props: PropInfo[] }): DemoPlan
 
 - [ ] **Step 1: Port the a11y test (as a failing test)**
 
-Create `packages/core/src/a11y/a11y.test.ts` by porting `~/dev/trains2somewhere/packages/design-system/src/registry/a11y.test.ts` to Vitest:
+Create `packages/core/src/a11y/a11y.test.ts` by porting trains2somewhere's `packages/design-system/src/registry/a11y.test.ts` to Vitest:
 - replace `import { test } from "node:test"` and `import assert from "node:assert/strict"` with `import { test, expect } from "vitest"`;
 - `assert.equal(a, b)` → `expect(a).toBe(b)`, `assert.deepEqual` → `expect(a).toEqual(b)`, `assert.ok(x)` → `expect(x).toBeTruthy()`;
 - rename the token keys in `vars` to token paths: `"--primary"` → `"palette.primary.main"`, `"--primary-foreground"` → `"palette.primary.contrastText"`, `"--background"` → `"palette.background.default"`, `"--ring"` → `"palette.action.focus"`, and update each `measure` to use the same paths;
@@ -1795,7 +1795,7 @@ Expected: FAIL, because `./a11y` was not found.
 
 - [ ] **Step 3: Port the implementation**
 
-Copy `~/dev/trains2somewhere/packages/design-system/src/registry/a11y.ts` to `packages/core/src/a11y/a11y.ts`, then make these changes:
+Copy trains2somewhere's `packages/design-system/src/registry/a11y.ts` to `packages/core/src/a11y/a11y.ts`, then make these changes:
 - Imports become:
   ```ts
   import type { ContrastMeasure, WcagCheck, WcagStatus } from "./types";

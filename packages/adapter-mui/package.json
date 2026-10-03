@@ -2,9 +2,31 @@
   "name": "@designloupe/adapter-mui",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicozoid/designloupe.git",
+    "directory": "packages/adapter-mui"
+  },
   "type": "module",
-  "exports": { "./node": "./src/node.ts", "./browser": "./src/browser.tsx" },
-  "dependencies": { "@designloupe/core": "0.1.0" },
-  "peerDependencies": { "@mui/material": ">=7", "@emotion/react": ">=11", "@emotion/styled": ">=11", "react": ">=18" },
-  "devDependencies": { "@mui/material": "^9.4.0", "@emotion/react": "^11.14.0", "@emotion/styled": "^11.14.1", "react": "^19.3.0", "react-dom": "^19.3.0" }
+  "exports": {
+    "./node": "./src/node.ts",
+    "./browser": "./src/browser.tsx"
+  },
+  "dependencies": {
+    "@designloupe/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "@mui/material": ">=7",
+    "@emotion/react": ">=11",
+    "@emotion/styled": ">=11",
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@mui/material": "^9.4.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
 }

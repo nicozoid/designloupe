@@ -2,7 +2,19 @@
   "name": "@designloupe/viewer",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicozoid/designloupe.git",
+    "directory": "packages/viewer"
+  },
   "type": "module",
-  "dependencies": { "@designloupe/core": "0.1.0", "@designloupe/adapter-mui": "0.1.0" },
-  "devDependencies": { "react": "^19.3.0", "react-dom": "^19.3.0" }
+  "dependencies": {
+    "@designloupe/core": "0.1.0",
+    "@designloupe/adapter-mui": "0.1.0"
+  },
+  "devDependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
 }

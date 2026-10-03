@@ -20,7 +20,7 @@ It never writes to your repo. MUI (v7+) is supported today. The core is library-
 Requires Node 22+. Runs on macOS and Linux; Windows is untested.
 
 ```bash
-git clone <this repo> designloupe && cd designloupe
+git clone https://github.com/nicozoid/designloupe.git && cd designloupe
 npm install
 npm run loupe:fixture        # serves the bundled example app at http://localhost:5179
 npm run loupe:fixture -- --open   # …and opens it in your browser

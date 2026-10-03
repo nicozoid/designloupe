@@ -7,9 +7,9 @@
 
 Design Loupe is an open-source, local-only tool that visualises the design system of a React app: tokens, theme customisations, components, icons and anomalies. You point it at a repo on disk and it serves a browser viewer on localhost. It never deploys anything and never modifies the target repo.
 
-It generalises the `/design-system` viewer built for `~/dev/trains2somewhere` (`packages/design-system`). It keeps that viewer's shell, voice and machinery: live values, contrast maths, the anomalies model, the drift check, copy chips, deep links and collapsible panels. It drops everything specific to trains2somewhere: map, logo, iconography gallery, branding and hand-written registries.
+It generalises the `/design-system` viewer in trains2somewhere, a separate project by the same author (its `packages/design-system`). It keeps that viewer's shell, voice and machinery: live values, contrast maths, the anomalies model, the drift check, copy chips, deep links and collapsible panels. It drops everything specific to trains2somewhere: map, logo, iconography gallery, branding and hand-written registries.
 
-**First target:** a work app (code not yet available) that is about 95% a lightly customised MUI 9 and about 5% custom components. Its bundler, theme location and providers are unknown. The tool is built and tested here against a fixture. It will be finished on the work machine with Claude Code, guided by docs shipped in this repo.
+**Typical target:** an app that is mostly a lightly customised MUI 9 with a minority of custom components, whose bundler, theme location and providers aren't known in advance. The tool is built and tested here against a fixture; onboarding a real app is guided by docs shipped in this repo (`docs/claude/onboarding-a-target.md`).
 
 ## Decisions
 
@@ -42,7 +42,7 @@ designloupe/
 import { defineConfig } from "@designloupe/core";
 
 export default defineConfig({
-  name: "Work app",
+  name: "My app",
   root: "/abs/path/to/target",            // target repo root
   adapter: "mui",
   themeEntry: "src/theme/index.ts",       // module exporting the theme
@@ -58,7 +58,7 @@ export default defineConfig({
 });
 ```
 
-All relative paths in the config resolve against the config file's directory, except `themeEntry`, `componentGlobs`, `ignoreGlobs`, `usageGlobs` and `tsconfig`, which resolve against `root`. The config can therefore live anywhere, e.g. in a personal folder next to the work repo.
+All relative paths in the config resolve against the config file's directory, except `themeEntry`, `componentGlobs`, `ignoreGlobs`, `usageGlobs` and `tsconfig`, which resolve against `root`. The config can therefore live anywhere, e.g. in a personal folder next to the target repo.
 
 ### Runtime flow
 
@@ -151,7 +151,7 @@ export default defineComponentDoc({
 
 ## Code reused from trains2somewhere
 
-The following is ported from `~/dev/trains2somewhere/packages/design-system`, rewritten without Tailwind/shadcn and with app-specific content removed:
+The following is ported from trains2somewhere's `packages/design-system`, rewritten without Tailwind/shadcn and with app-specific content removed:
 
 - the shell layout and sidebar behaviour;
 - the copyable code chip;
