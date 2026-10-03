@@ -38,10 +38,18 @@ const isBare = (s: string) => !s.startsWith(".") && !s.startsWith("\0") && !path
 /** Build output, caches and dot-dirs: changes there never affect discovery. */
 const IGNORED_DIRS = new Set(["node_modules", "dist", "build", "out", "coverage"]);
 
-/** Whether a watcher event for `file` should trigger rediscovery. */
-export function shouldRediscover(file: string, dirs: { root: string; loupeDir?: string }): boolean {
+/** The fixed folder each glob starts from, absolute (`../../packages/ui/src/**` → `<root>/../../packages/ui/src`). */
+export function globDirs(globs: string[], root: string): string[] {
+  return [...new Set(fg.generateTasks(globs, { cwd: root }).map((t) => path.resolve(root, t.base)))];
+}
+
+/**
+ * Whether a watcher event for `file` should trigger rediscovery. `extra` holds folders outside the target that
+ * component globs reach, e.g. a monorepo's `packages/ui/src`.
+ */
+export function shouldRediscover(file: string, dirs: { root: string; loupeDir?: string; extra?: string[] }): boolean {
   if (!/\.(tsx?|jsx?)$/.test(file)) return false;
-  const base = [dirs.root, dirs.loupeDir].find((d): d is string => !!d && within(file, d));
+  const base = [dirs.root, dirs.loupeDir, ...(dirs.extra ?? [])].find((d): d is string => !!d && within(file, d));
   if (!base) return false;
   const segments = path.relative(base, file).split(path.sep).slice(0, -1);
   return !segments.some((d) => d.startsWith(".") || IGNORED_DIRS.has(d));
@@ -59,6 +67,8 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
   const root = real(config.root);
   const configDir = real(config.configDir);
   const loupeDir = config.loupeDir ? real(config.loupeDir) : undefined;
+  // Component globs may reach outside the target (a monorepo's ../../packages/ui/src/**): watch those folders too.
+  const extraDirs = globDirs(config.componentGlobs, config.root).map(real).filter((d) => !within(d, root));
   // Importer for "resolve as if from the target". Vite only bases resolution on an importer's folder when the
   // importer exists or ends in "*" (otherwise it silently falls back to the Vite root, i.e. the viewer).
   const anchor = path.join(root, "*");
@@ -137,7 +147,7 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
   let generation = 0;
   const watch = (server: ViteDevServer) => {
     const onChange = (file: string) => {
-      if (!shouldRediscover(real(file), { root, loupeDir })) return;
+      if (!shouldRediscover(real(file), { root, loupeDir, extra: extraDirs })) return;
       clearTimeout(timer);
       timer = setTimeout(async () => {
         const gen = ++generation;
@@ -160,7 +170,7 @@ export function loupePlugin(opts: { config: ResolvedConfig; model: DiscoveryMode
         server.ws.send({ type: "full-reload" });
       }, 300);
     };
-    server.watcher.add([root, ...(loupeDir ? [loupeDir] : [])]);
+    server.watcher.add([root, ...(loupeDir ? [loupeDir] : []), ...extraDirs]);
     server.watcher.on("add", onChange).on("unlink", onChange).on("change", onChange);
   };
 

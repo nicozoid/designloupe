@@ -32,11 +32,26 @@ export function createAnalysis(root: string, tsconfigPath: string): Analysis {
   const cache = ts.createModuleResolutionCache(root, (f) => f, options);
   const SOURCE = /\.(tsx?|jsx?|mjs|cjs)$/;
 
+  const NM = `${path.sep}node_modules${path.sep}`;
+  const realpath = (f: string) => {
+    try {
+      return fs.realpathSync(f);
+    } catch {
+      return f;
+    }
+  };
+
   const resolve = (specifier: string, fromFile: string) => {
     const r = ts.resolveModuleName(specifier, fromFile, options, host, cache).resolvedModule;
-    if (!r || r.isExternalLibraryImport) return undefined;
-    const f = path.resolve(r.resolvedFileName);
-    if (f.endsWith(".d.ts") || f.includes(`${path.sep}node_modules${path.sep}`) || !SOURCE.test(f)) return undefined;
+    if (!r) return undefined;
+    let f = path.resolve(r.resolvedFileName);
+    // A package import is usually a library, except in a monorepo, where `@acme/ui` is a symlink to a workspace
+    // package's source (packages/ui/src): that is the design system itself, so keep it, by its real path.
+    if (r.isExternalLibraryImport || f.includes(NM)) {
+      f = realpath(f);
+      if (f.includes(NM)) return undefined;
+    }
+    if (f.endsWith(".d.ts") || !SOURCE.test(f)) return undefined;
     return f;
   };
 

@@ -28,6 +28,23 @@ resolved relative to the **config file's directory**. `themeEntry`, `componentGl
 and `tsconfig` are resolved relative to `root`. This lets the config folder and the target repo move
 independently of each other.
 
+## Monorepos: a design system in a workspace package
+
+Set `root` to the app package (the one that owns `react`) and reach the workspace package with `..` in
+`componentGlobs`, which resolve from `root`:
+
+```ts
+export default defineConfig({
+  root: "../../my-monorepo/apps/web",
+  componentGlobs: ["src/components/**/*.tsx", "../../packages/ui/src/**/*.tsx"],
+});
+```
+
+Imports through the package name (`import { Button } from "@acme/ui"`, a symlink in `node_modules`) count
+as usages of those components, provided the package's `types`/`main`/`exports` lead TypeScript to its
+**source** (`src/index.ts`) rather than built `dist/*.d.ts` files. The dev server watches the folders these
+globs reach, and adds them to Vite's `fs.allow`.
+
 ## Barrels (`index.ts` re-exports)
 
 A barrel such as `Button/index.ts` containing `export { Button } from "./Button"` is fine inside

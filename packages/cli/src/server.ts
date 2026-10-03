@@ -6,7 +6,7 @@ import fs from "node:fs";
 import { discover } from "@designloupe/core/node";
 import type { ResolvedConfig } from "@designloupe/core";
 import muiNode from "@designloupe/adapter-mui/node";
-import { loupePlugin, optimizeEntries } from "./vite-plugin";
+import { globDirs, loupePlugin, optimizeEntries } from "./vite-plugin";
 import { REPO_ROOT, VIEWER_ROOT } from "./paths";
 import { loupeCacheDir } from "./cache-dir";
 
@@ -75,6 +75,8 @@ export async function createLoupeServer(
           searchForWorkspaceRoot(config.root),
           config.configDir,
           ...(config.loupeDir ? [config.loupeDir] : []),
+          // Component globs reaching outside the target (a monorepo's ../../packages/ui/src/**).
+          ...globDirs(config.componentGlobs, config.root),
         ],
       },
     },

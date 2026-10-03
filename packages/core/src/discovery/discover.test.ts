@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import type { ResolvedConfig } from "../config/schema";
 import { loadConfig } from "../config/load";
 import { createAnalysis, type Analysis } from "../analysis/program";
 import type { AdapterNode } from "../adapter";
@@ -46,4 +49,38 @@ describe("discover: per-file docgen isolation", () => {
     },
     120_000,
   );
+});
+
+describe("discover: monorepo workspace package", () => {
+  it("finds usages of design-system components that live in a symlinked workspace package", async () => {
+    // Real path: on macOS os.tmpdir() is behind a symlink, and TS hands back real paths for node_modules lookups.
+    const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "loupe-mono-")));
+    const write = (file: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(tmp, file)), { recursive: true });
+      fs.writeFileSync(path.join(tmp, file), text);
+    };
+    try {
+      write("packages/ui/package.json", JSON.stringify({ name: "@acme/ui", version: "0.0.0", types: "src/index.ts", main: "src/index.ts" }));
+      write("packages/ui/src/index.ts", 'export { Button } from "./Button";\n');
+      write("packages/ui/src/Button.tsx", "/** A button. */\nexport function Button(props: { label: string }) { return <button>{props.label}</button>; }\n");
+      write("apps/web/package.json", JSON.stringify({ name: "web", private: true }));
+      write("apps/web/tsconfig.json", JSON.stringify({ compilerOptions: { jsx: "react-jsx", moduleResolution: "bundler", module: "esnext", strict: true } }));
+      write("apps/web/src/Page.tsx", 'import { Button } from "@acme/ui";\n\nexport const Page = () => <Button label="Go" />;\n');
+      fs.mkdirSync(path.join(tmp, "apps/web/node_modules/@acme"), { recursive: true });
+      fs.symlinkSync(path.join(tmp, "packages/ui"), path.join(tmp, "apps/web/node_modules/@acme/ui"), "dir");
+
+      const root = path.join(tmp, "apps/web");
+      const config = {
+        name: "Mono", root, adapter: "mui", themeExport: "theme",
+        componentGlobs: ["../../packages/ui/src/**/*.tsx"], ignoreGlobs: [], usageGlobs: ["src/**/*.tsx"],
+        tsconfig: path.join(root, "tsconfig.json"), shims: {}, presets: [], define: {},
+        configPath: path.join(tmp, "loupe.config.ts"), configDir: tmp,
+      } as ResolvedConfig;
+      const model = await discover(config, fakeAdapter);
+      expect(model.components.map((c) => c.id)).toEqual(["../../packages/ui/src/Button.tsx#Button"]);
+      expect(model.components[0]!.usages).toEqual([{ file: "src/Page.tsx", line: 3 }]);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

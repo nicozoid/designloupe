@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import type { DiscoveryModel, ResolvedConfig } from "@designloupe/core";
-import { loupePlugin, sameModel, shouldRediscover, within } from "./vite-plugin";
+import { globDirs, loupePlugin, sameModel, shouldRediscover, within } from "./vite-plugin";
 
 const root = path.join(path.sep, "work", "app");
 const loupeDir = path.join(path.sep, "work", "app-loupe");
@@ -30,6 +30,17 @@ describe("shouldRediscover", () => {
   });
 });
 
+describe("monorepo component globs", () => {
+  const ui = path.join(path.sep, "work", "packages", "ui");
+  it("watches the folders component globs reach outside the target", () => {
+    expect(globDirs(["../packages/ui/src/**/*.tsx", "src/components/**/*.tsx"], at(path.sep, "work", "app"))).toEqual([at(ui, "src"), at(root, "src/components")]);
+    const dirs = { root, loupeDir, extra: [at(ui, "src")] };
+    expect(shouldRediscover(at(ui, "src/Button.tsx"), dirs)).toBe(true);
+    expect(shouldRediscover(at(ui, "src/node_modules/x/y.js"), dirs)).toBe(false);
+    expect(shouldRediscover(at(ui, "dist/Button.js"), dirs)).toBe(false);
+  });
+});
+
 describe("sameModel", () => {
   const model = { name: "A", components: [], generatedAt: "2026-10-02T00:00:00Z" } as unknown as DiscoveryModel;
   it("ignores generatedAt but notices real changes", () => {
@@ -39,7 +50,7 @@ describe("sameModel", () => {
 });
 
 describe("virtual:loupe/icons", () => {
-  const config = { root, presets: [], shims: {}, configDir: loupeDir, adapter: "mui", themeExport: "theme" } as unknown as ResolvedConfig;
+  const config = { root, componentGlobs: ["src/**/*.tsx"], presets: [], shims: {}, configDir: loupeDir, adapter: "mui", themeExport: "theme" } as unknown as ResolvedConfig;
   const icon = (name: string) => ({ name, source: "library" as const, importPath: "@mui/icons-material", sites: [] });
   const model = { components: [], icons: [icon("Delete"), icon("NotAnIcon")] } as unknown as DiscoveryModel;
 
