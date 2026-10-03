@@ -47,7 +47,8 @@ or `package.json` in the target is **not** watched; restart the dev server after
 | `Failed to resolve import "@/…"` | The alias isn't in the target tsconfig `paths`. Add `vite: { resolve: { alias: { "@": "<root>/src" } } }`. |
 | `Failed to resolve import "next/…"` | Add `presets: ["next"]`. For modules the preset doesn't cover (e.g. `next/headers`), add a shim file in the config folder and map it in `shims`. |
 | `process is not defined` / undefined env | Add `define: { "process.env.X": JSON.stringify("…") }`. |
-| `.svg` imports as components | Install `vite-plugin-svgr` **in this repo** (`npm i -D vite-plugin-svgr` at the Design Loupe root — it isn't installed by default) and add `vite: { plugins: [svgr()] }`. |
+| `.svg` imports as components | Install `vite-plugin-svgr` **in this repo** (`npm i -D vite-plugin-svgr` at the Design Loupe root — it isn't installed by default). Plain `svgr()` only handles `*.svg?react`: for `import Logo from "./logo.svg"` (Next.js) use `svgr({ include: "**/*.svg", svgrOptions: { exportType: "default" } })`; for `import { ReactComponent as Logo }` (CRA) use `exportType: "named", namedExport: "ReactComponent"`. See `docs/config.md`. |
+| `[PARSE_ERROR] Unexpected JSX expression` in a `.js` file (CRA) | Vite only parses JSX in `.jsx`/`.tsx`. Add the `jsx-in-js` plugin from `docs/config.md` ("`vite` escape hatch"). Don't set `vite.oxc.lang`: it applies to `.ts`/`.tsx` files too and breaks them. |
 | `.scss` | `sass` must be resolvable. Install it in this repo as a devDependency. |
 | "Invalid hook call" / two Reacts | The target's React wasn't used. Check that the target has `node_modules`. If the target is a monorepo, set `root` to the package that owns `react`. |
 | "useX must be used within XProvider" | Add that provider to `Wrapper.tsx`. |

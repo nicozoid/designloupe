@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { loadConfig, ConfigError } from "./load";
 
@@ -37,5 +39,24 @@ describe("loadConfig", () => {
 
   it("fails clearly when the config file is missing", async () => {
     await expect(loadConfig(path.join(dir, "nope.config.ts"))).rejects.toMatchObject({ field: "config" });
+  });
+
+  it("lets an out-of-repo config import packages installed in this repo (e.g. vite plugins)", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "loupe-config-"));
+    try {
+      const file = path.join(tmp, "loupe.config.ts");
+      fs.writeFileSync(
+        file,
+        [
+          'import { defineConfig } from "@designloupe/core";',
+          'import { version } from "vite";',
+          'export default defineConfig({ name: `vite ${version}`, root: ".", componentGlobs: ["**/*.tsx"] });',
+        ].join("\n"),
+      );
+      const c = await loadConfig(file);
+      expect(c.name).toMatch(/^vite \d+\./);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

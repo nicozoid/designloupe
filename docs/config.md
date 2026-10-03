@@ -110,14 +110,41 @@ mapped via `shims`.
 than replacing anything.
 
 SVGR (importing `.svg` files as React components) — install `vite-plugin-svgr` **in this repo** first
-(`npm i -D vite-plugin-svgr` at the Design Loupe root), then:
+(`npm i -D vite-plugin-svgr` at the Design Loupe root). A config folder outside this repo can still import
+it: packages a config imports that aren't installed next to it are loaded from this repo. Plain `svgr()` only
+handles `*.svg?react` imports, so match the target's import style:
 
 ```ts
 import svgr from "vite-plugin-svgr";
 
 export default defineConfig({
   // ...
-  vite: { plugins: [svgr()] },
+  // Next.js / @svgr/webpack style: `import Logo from "./logo.svg"` is the component.
+  vite: { plugins: [svgr({ include: "**/*.svg", svgrOptions: { exportType: "default" } })] },
+  // Create React App style: `import { ReactComponent as Logo } from "./logo.svg"`.
+  // vite: { plugins: [svgr({ include: "**/*.svg", svgrOptions: { exportType: "named", namedExport: "ReactComponent" } })] },
+});
+```
+
+JSX in `.js` files (Create React App allows it; Vite doesn't). Vite 8 compiles with Oxc, whose `lang` option
+applies to every file it includes, so setting `vite: { oxc: { lang: "jsx" } }` breaks `.ts`/`.tsx` files. Add a
+small plugin that compiles only `.js` files as JSX instead:
+
+```ts
+import { transformWithOxc, type Plugin } from "vite";
+
+const jsxInJs: Plugin = {
+  name: "jsx-in-js",
+  enforce: "pre",
+  transform(code, id) {
+    if (!/\.js$/.test(id) || id.includes("/node_modules/")) return null;
+    return transformWithOxc(code, id, { lang: "jsx", jsx: { runtime: "automatic" } });
+  },
+};
+
+export default defineConfig({
+  // ...
+  vite: { plugins: [jsxInJs] },
 });
 ```
 
