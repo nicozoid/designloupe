@@ -5,7 +5,7 @@ import { loadTheme } from "virtual:loupe/theme";
 import { loadWrapper } from "virtual:loupe/wrapper";
 import { componentDocs, loadAnomalies, loadTokenNotes } from "virtual:loupe/loupe-files";
 import type { AdapterBrowser, Anomaly, ComponentDocInput, DiscoveryModel, Mode, OverrideEntry, TokenModel, TokenNotes } from "@designloupe/core";
-import { collectDocs } from "./docs";
+import { checkAnomalies, collectDocs } from "./docs";
 
 export interface LoupeState {
   model: DiscoveryModel;
@@ -24,6 +24,8 @@ export interface LoupeState {
   canDark: boolean;
   failures: Record<string, string>;
   reportFailure(id: string, message: string): void;
+  /** The wrapper loaded but threw while rendering: shown on the Overview like a load failure. */
+  reportWrapperError(message: string): void;
   Wrapper: ComponentType<{ children: ReactNode }> | null;
 }
 
@@ -50,7 +52,7 @@ function idsFor(component: string): string[] {
   return model.components.filter((c) => c.file === file && (!exp || c.exportName === exp || c.name === exp)).map((c) => c.id);
 }
 
-type Loaded = Omit<LoupeState, "mode" | "setMode" | "failures" | "reportFailure" | "canDark">;
+type Loaded = Omit<LoupeState, "mode" | "setMode" | "failures" | "reportFailure" | "reportWrapperError" | "canDark">;
 
 async function loadAll(): Promise<Loaded> {
   const out: Loaded = {
@@ -80,7 +82,11 @@ async function loadAll(): Promise<Loaded> {
   out.docs = docs;
   out.docErrors.push(...docErrors);
   try {
-    out.authoredAnomalies = (await loadAnomalies?.()) ?? [];
+    if (loadAnomalies) {
+      const { anomalies, errors } = checkAnomalies(await loadAnomalies());
+      out.authoredAnomalies = anomalies;
+      out.docErrors.push(...errors);
+    }
   } catch (e) {
     out.docErrors.push(`anomalies file: ${msg(e)}`);
   }
@@ -96,6 +102,7 @@ export function LoupeProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [mode, setModeState] = useState<Mode>(readMode);
   const [failures, setFailures] = useState<Record<string, string>>({});
+  const [wrapperRenderError, setWrapperRenderError] = useState<string>();
 
   useEffect(() => {
     loadAll().then(setLoaded).catch((e) =>
@@ -126,9 +133,18 @@ export function LoupeProvider({ children }: { children: ReactNode }) {
     setFailures((f) => (f[id] === message ? f : { ...f, [id]: message }));
   }, []);
 
+  const reportWrapperError = useCallback((message: string) => setWrapperRenderError(`Rendering failed: ${message}`), []);
+
   const value = useMemo<LoupeState | null>(
-    () => (loaded ? { ...loaded, mode: effectiveMode, setMode, canDark, failures, reportFailure } : null),
-    [loaded, effectiveMode, setMode, canDark, failures, reportFailure],
+    () =>
+      loaded
+        ? {
+            ...loaded,
+            wrapperError: loaded.wrapperError ?? wrapperRenderError,
+            mode: effectiveMode, setMode, canDark, failures, reportFailure, reportWrapperError,
+          }
+        : null,
+    [loaded, wrapperRenderError, effectiveMode, setMode, canDark, failures, reportFailure, reportWrapperError],
   );
 
   if (!value) return <div className="dl-loading">Loading design system…</div>;

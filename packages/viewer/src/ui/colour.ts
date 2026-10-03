@@ -5,7 +5,14 @@ export function toHex(color: string): string {
   canvas.width = canvas.height = 1;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return "";
+  // An invalid colour leaves fillStyle unchanged, so it would read back as the previous colour (#000000 on a
+  // fresh canvas). Assign it over two different sentinels: if both survive, the canvas rejected it.
+  ctx.fillStyle = "#010203";
   ctx.fillStyle = color;
+  const first = ctx.fillStyle;
+  ctx.fillStyle = "#020304";
+  ctx.fillStyle = color;
+  if (first === "#010203" && ctx.fillStyle === "#020304") return "";
   ctx.fillRect(0, 0, 1, 1);
   const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
   const h = (n: number) => n.toString(16).padStart(2, "0");
