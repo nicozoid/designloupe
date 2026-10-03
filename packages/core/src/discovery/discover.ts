@@ -18,7 +18,7 @@ type ComponentDoc = ReturnType<Analysis["parseProps"]>[number];
 export interface DiscoverCache {
   /** File scans, keyed by file, with the file's stamp when scanned. */
   scans: Map<string, { stamp: string; scan: FileScan }>;
-  /** The last docgen result and the stamps of the files it read (component files and the files they import). */
+  /** The last docgen result and the stamps of the files it read (component files and every target file its TS program loaded). */
   docgen?: DocgenResult;
 }
 export interface DocgenResult { componentFiles: string[]; inputs: Map<string, string>; docs: ComponentDoc[]; warnings: string[] }
@@ -35,7 +35,8 @@ export function fileStamp(file: string): string {
   }
 }
 
-/** Docgen (the slow part) only needs re-running when a component file, or a file one imports, changed, or the component list did. */
+/** Docgen (the slow part) only needs re-running when a file it read (a component file, or any target file one reaches,
+ * type-only imports included) changed, or the component list did. */
 export function needsDocgen(prev: DocgenResult | undefined, componentFiles: string[], stampOf: (file: string) => string): boolean {
   if (!prev) return true;
   if (prev.componentFiles.length !== componentFiles.length || prev.componentFiles.some((f, i) => f !== componentFiles[i])) return true;
@@ -103,20 +104,24 @@ export async function discover(config: ResolvedConfig, adapter: AdapterNode, dep
   // blank out every component.
   const runDocgen = (): DocgenResult => {
     const docgenWarnings: string[] = [];
-    // Stamp the inputs before reading them, so a save during docgen is picked up by the next run.
+    // Stamp each file before docgen reads it, so a save during docgen is picked up by the next run. Component files and
+    // their imports are stamped up front; everything else (type-only imports, deeper hops) as the TS program loads it.
     const inputs = new Map<string, string>();
     for (const file of componentFiles) {
       inputs.set(file, fileStamp(file));
       for (const b of getScan(file)?.imports ?? []) if (b.resolvedFile) inputs.set(b.resolvedFile, fileStamp(b.resolvedFile));
     }
+    const onRead = (file: string) => {
+      if (!inputs.has(file)) inputs.set(file, fileStamp(file));
+    };
     let docs: ComponentDoc[] = [];
     try {
-      docs = analysis.parseProps(componentFiles);
+      docs = analysis.parseProps(componentFiles, onRead);
     } catch {
       docs = [];
       for (const file of componentFiles) {
         try {
-          docs.push(...analysis.parseProps([file]));
+          docs.push(...analysis.parseProps([file], onRead));
         } catch (e) {
           docgenWarnings.push(`Props extraction failed for ${rel(file)}: ${(e as Error).message}`);
         }

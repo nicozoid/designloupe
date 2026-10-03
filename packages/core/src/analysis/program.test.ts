@@ -24,4 +24,14 @@ describe("createAnalysis", () => {
     expect(doc.props.label!.required).toBe(true);
     expect(doc.props.type!.type.name).toBe("enum");
   });
+
+  it("reports the target files docgen reads, with the same props as a plain parse, and nothing from node_modules", () => {
+    const file = path.join(root, "src/components/TextInput.tsx");
+    const read: string[] = [];
+    const docs = a.parseProps([file], (f) => read.push(f));
+    expect(docs).toEqual(a.parseProps([file]));
+    expect(read).toContain(file);
+    expect(read.length).toBeGreaterThan(0);
+    expect(read.every((f) => path.isAbsolute(f) && !f.includes(`${path.sep}node_modules${path.sep}`))).toBe(true);
+  });
 });

@@ -108,7 +108,7 @@ describe("discover: reuse between runs", () => {
     let invalidations = 0;
     const counting: Analysis = {
       resolve: real.resolve,
-      parseProps: (files) => (docgenRuns++, real.parseProps(files)),
+      parseProps: (files, onRead) => (docgenRuns++, real.parseProps(files, onRead)),
       invalidate: () => invalidations++,
     };
     const cache = createDiscoverCache();
@@ -137,5 +137,62 @@ describe("discover: reuse between runs", () => {
     await discover(config, fakeAdapter, { analysis: counting, cache, structural: true });
     expect(docgenRuns).toBe(3);
     expect(invalidations).toBe(before + 1);
+  }, 120_000);
+});
+
+describe("discover: reuse sees edits to files docgen read through type-only imports", () => {
+  it("re-runs docgen when an imported props type changes, one hop or two, and matches a fresh run", async () => {
+    const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "loupe-stale-")));
+    const write = (file: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(tmp, file)), { recursive: true });
+      fs.writeFileSync(path.join(tmp, file), text);
+    };
+    try {
+      write("package.json", JSON.stringify({ name: "stale", private: true }));
+      write("tsconfig.json", JSON.stringify({ compilerOptions: { jsx: "react-jsx", moduleResolution: "bundler", module: "esnext", strict: true } }));
+      write("src/components/base.ts", "export interface Base {\n  id?: string;\n}\n");
+      write("src/components/types.ts", 'import type { Base } from "./base";\n\nexport interface CardProps extends Base {\n  title: string;\n}\n');
+      write("src/components/Card.tsx", 'import type { CardProps } from "./types";\n\nexport function Card(props: CardProps) {\n  return <div>{props.title}</div>;\n}\n');
+      write("src/pages/Page.tsx", 'import { Card } from "../components/Card";\n\nexport const Page = () => <Card title="Hi" />;\n');
+      const config = {
+        name: "Stale", root: tmp, adapter: "mui", themeExport: "theme",
+        componentGlobs: ["src/components/**/*.tsx"], ignoreGlobs: [], usageGlobs: ["src/pages/**/*.tsx"],
+        tsconfig: path.join(tmp, "tsconfig.json"), shims: {}, presets: [], define: {}, watch: false,
+        configPath: path.join(tmp, "loupe.config.ts"), configDir: tmp,
+      } as ResolvedConfig;
+
+      // As the dev server does: one analysis and one cache for its lifetime.
+      const real = createAnalysis(config.root, config.tsconfig);
+      let docgenRuns = 0;
+      const counting: Analysis = { ...real, parseProps: (...args: Parameters<Analysis["parseProps"]>) => (docgenRuns++, real.parseProps(...args)) };
+      const cache = createDiscoverCache();
+      const strip = (m: DiscoveryModel) => ({ ...m, generatedAt: "" });
+      const fresh = () => discover(config, fakeAdapter);
+      const propNames = (m: DiscoveryModel) => m.components.find((c) => c.name === "Card")!.props.map((p) => p.name).sort();
+
+      const first = await discover(config, fakeAdapter, { analysis: counting, cache });
+      expect(propNames(first)).toEqual(["id", "title"]);
+      expect(docgenRuns).toBe(1);
+
+      // A usage-only save keeps the reused props.
+      write("src/pages/Page.tsx", 'import { Card } from "../components/Card";\n\nexport const Page = () => <Card title="Hello" />;\n');
+      const usageOnly = await discover(config, fakeAdapter, { analysis: counting, cache, structural: false });
+      expect(docgenRuns).toBe(1);
+      expect(strip(usageOnly)).toEqual(strip(await fresh()));
+
+      // One hop: Card.tsx -> (import type) types.ts.
+      write("src/components/types.ts", 'import type { Base } from "./base";\n\nexport interface CardProps extends Base {\n  title: string;\n  subtitle?: string;\n}\n');
+      const oneHop = await discover(config, fakeAdapter, { analysis: counting, cache, structural: false });
+      expect(propNames(oneHop)).toEqual(["id", "subtitle", "title"]);
+      expect(strip(oneHop)).toEqual(strip(await fresh()));
+
+      // Two hops: Card.tsx -> types.ts -> base.ts.
+      write("src/components/base.ts", "export interface Base {\n  id?: string;\n  tone?: \"calm\" | \"loud\";\n}\n");
+      const twoHops = await discover(config, fakeAdapter, { analysis: counting, cache, structural: false });
+      expect(propNames(twoHops)).toEqual(["id", "subtitle", "title", "tone"]);
+      expect(strip(twoHops)).toEqual(strip(await fresh()));
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   }, 120_000);
 });

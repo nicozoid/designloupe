@@ -5,7 +5,9 @@ import * as docgen from "react-docgen-typescript";
 
 export interface Analysis {
   resolve(specifier: string, fromFile: string): string | undefined;
-  parseProps(files: string[]): docgen.ComponentDoc[];
+  /** Extract props with docgen. `onRead` is called with each target source file (absolute, nothing under node_modules)
+   * just before docgen's TS program reads it: the component files and everything they reach, type-only imports included. */
+  parseProps(files: string[], onRead?: (file: string) => void): docgen.ComponentDoc[];
   /** Forget cached module resolutions (after files were added or removed). */
   invalidate?(): void;
 }
@@ -66,5 +68,19 @@ export function createAnalysis(root: string, tsconfigPath: string): Analysis {
     propFilter: () => true,
   });
 
-  return { resolve, parseProps: (files) => parser.parse(files), invalidate: () => cache.clear() };
+  const parseProps = (files: string[], onRead?: (file: string) => void) => {
+    if (!onRead) return parser.parse(files);
+    // The program docgen would build itself, but with a host that reports each file as it is read.
+    const readHost = ts.createCompilerHost(options);
+    const getSourceFile = readHost.getSourceFile;
+    readHost.getSourceFile = (fileName, ...rest) => {
+      const f = path.resolve(fileName);
+      if (!f.includes(NM)) onRead(f);
+      return getSourceFile.call(readHost, fileName, ...rest);
+    };
+    const program = ts.createProgram(files, options, readHost);
+    return parser.parseWithProgramProvider(files, () => program);
+  };
+
+  return { resolve, parseProps, invalidate: () => cache.clear() };
 }
