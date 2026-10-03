@@ -1,5 +1,5 @@
 import path from "node:path";
-import { createServer, mergeConfig, searchForWorkspaceRoot, type InlineConfig, type ViteDevServer } from "vite";
+import { createLogger, createServer, mergeConfig, searchForWorkspaceRoot, type InlineConfig, type Logger, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import fs from "node:fs";
@@ -9,6 +9,32 @@ import muiNode from "@designloupe/adapter-mui/node";
 import { loupePlugin, optimizeEntries } from "./vite-plugin";
 import { REPO_ROOT, VIEWER_ROOT } from "./paths";
 import { loupeCacheDir } from "./cache-dir";
+
+/**
+ * Vite 8 warns, on every server start, that vite-tsconfig-paths is unnecessary now that
+ * `resolve.tsconfigPaths` exists natively. We keep the plugin anyway: it pins `config.tsconfig`
+ * (the target's own tsconfig, possibly non-default), which the native option can't do. This
+ * matches only that specific warning, so every other warning still gets through unchanged.
+ */
+export function isRedundantTsconfigPathsWarning(msg: string): boolean {
+  const plain = msg.replace(/\x1b\[[0-9;]*m/g, "");
+  return /vite-tsconfig-paths/.test(plain) && /tsconfigPaths/.test(plain);
+}
+
+function createFilteredLogger(): Logger {
+  const base = createLogger();
+  return {
+    ...base,
+    warn(msg, options) {
+      if (isRedundantTsconfigPathsWarning(msg)) return;
+      base.warn(msg, options);
+    },
+    warnOnce(msg, options) {
+      if (isRedundantTsconfigPathsWarning(msg)) return;
+      base.warnOnce(msg, options);
+    },
+  };
+}
 
 export async function createLoupeServer(
   config: ResolvedConfig,
@@ -24,6 +50,7 @@ export async function createLoupeServer(
     // Per target: the default (viewer/node_modules/.vite) would hand one target's prebundled React/MUI to the next.
     cacheDir: loupeCacheDir(config.root),
     logLevel: "info",
+    customLogger: createFilteredLogger(),
     clearScreen: false,
     plugins: [
       loupePlugin({ config, model, rediscover }),

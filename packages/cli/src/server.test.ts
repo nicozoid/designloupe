@@ -5,8 +5,24 @@ import path from "node:path";
 import type { ViteDevServer } from "vite";
 import type { ResolvedConfig } from "@designloupe/core";
 import { loadConfig } from "@designloupe/core/node";
-import { createLoupeServer } from "./server";
+import { createLoupeServer, isRedundantTsconfigPathsWarning } from "./server";
 import { REPO_ROOT } from "./paths";
+
+describe("isRedundantTsconfigPathsWarning", () => {
+  it("matches vite's warning about the vite-tsconfig-paths plugin being unnecessary", () => {
+    const msg =
+      'The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.';
+    expect(isRedundantTsconfigPathsWarning(msg)).toBe(true);
+    // Colour codes (picocolors) around the message must not defeat the match.
+    expect(isRedundantTsconfigPathsWarning(`\x1b[33m${msg}\x1b[39m`)).toBe(true);
+  });
+
+  it("leaves unrelated warnings alone", () => {
+    expect(isRedundantTsconfigPathsWarning("Some other warning about tsconfigPaths resolution failing")).toBe(false);
+    expect(isRedundantTsconfigPathsWarning('The plugin "vite-tsconfig-paths" crashed while loading')).toBe(false);
+    expect(isRedundantTsconfigPathsWarning("Nothing to see here")).toBe(false);
+  });
+});
 
 const fixture = path.join(REPO_ROOT, "examples/mui-fixture");
 let server: ViteDevServer;
