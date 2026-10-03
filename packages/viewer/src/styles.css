@@ -103,3 +103,10 @@ a.dl-tile:hover { border-color: var(--dl-accent); }
 .dl-needs-demo code { margin: 0 0.2rem; }
 .dl-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.25rem; }
 kbd { font: 12px var(--dl-mono); border: 1px solid var(--dl-border); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3rem; background: var(--dl-sunken); }
+.dl-icon-tile { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+.dl-icon-tile .dl-stage { width: 100%; box-sizing: border-box; }
+.dl-filters { margin-bottom: 1rem; }
+.dl-filter { border: 1px solid var(--dl-border); background: var(--dl-surface); color: inherit; border-radius: 999px; padding: 0.2rem 0.75rem; font: inherit; cursor: pointer; }
+.dl-filter.is-active { background: var(--dl-accent-soft); color: var(--dl-accent); border-color: var(--dl-accent); }
+.dl-anomaly p { margin: 0.4rem 0; }
+.dl-search-results h2 { font-size: 1rem; }

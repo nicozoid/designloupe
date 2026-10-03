@@ -11,6 +11,10 @@ import { Elevation } from "./pages/Elevation";
 import { Motion } from "./pages/Motion";
 import { Overrides } from "./pages/Overrides";
 import { Components } from "./pages/Components";
+import { LibraryUsage } from "./pages/LibraryUsage";
+import { Icons } from "./pages/Icons";
+import { Anomalies } from "./pages/Anomalies";
+import { Search } from "./pages/Search";
 
 /** Page registry. Later tasks add entries here. */
 export const PAGES: Record<string, ComponentType> = {
@@ -22,6 +26,10 @@ export const PAGES: Record<string, ComponentType> = {
   "tokens/motion": Motion,
   overrides: Overrides,
   components: Components,
+  library: LibraryUsage,
+  icons: Icons,
+  anomalies: Anomalies,
+  search: Search,
 };
 
 function pageKey(segments: string[]): string {

@@ -14,3 +14,4 @@ export type { WcagRow, WcagRollup, WcagVerdict } from "./a11y/a11y";
 export { planAutoDemo } from "./demo/plan";
 export type { DemoPlan } from "./demo/plan";
 export { hintFor } from "./hints";
+export { findingsToAnomalies, contrastAnomaly, buildAnomaly } from "./anomalies/auto";
